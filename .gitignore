@@ -33,3 +33,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### prometheus & grafana ###
+/prometheus/data/
+/grafana/data
+
+### tokens ###
+/test-local-run.http
+/test-on-prem-run.http
