@@ -1,4 +1,4 @@
-package ru.quipy.common.utils
+package ru.quipy.common.utils.ratelimiter.implementation
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -6,9 +6,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import ru.quipy.common.utils.ratelimiter.RateLimiter
 import java.time.Duration
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
+import kotlin.time.Duration.Companion.milliseconds
 
 class LeakingBucketRateLimiter(
     private val rate: Long,
@@ -24,7 +26,7 @@ class LeakingBucketRateLimiter(
 
     private val releaseJob = rateLimiterScope.launch {
         while (true) {
-            delay(window.toMillis())
+            delay(window.toMillis().milliseconds)
             for (i in 0..rate) {
                 queue.poll()
             }

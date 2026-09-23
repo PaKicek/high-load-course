@@ -2,12 +2,21 @@
 POST http://localhost:1234/test/run
 Content-Type: application/json
 
+# Use example
+#{
+#  "serviceName": "{{serviceName}}",
+#  "token": "{{token}}",
+#  "ratePerSecond": 1,
+#  "testCount": 100,
+#  "processingTimeMillis": 80000
+#}
+
+# hw-01
 {
   "serviceName": "{{serviceName}}",
   "token": "{{token}}",
-  "ratePerSecond": 1,
-  "testCount": 100,
-  "processingTimeMillis": 80000
+  "ratePerSecond": 11,
+  "testCount": 1200
 }
 
 ### Stop running test to save time and resources

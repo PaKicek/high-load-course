@@ -9,7 +9,6 @@ class CountingErrorMeter(
 ) {
     private val invocations: Array<Event?> = Array(window) { null }
     private val counter = AtomicInteger()
-
     private val total = AtomicLong(0)
     private val err = AtomicLong(0)
 
@@ -32,7 +31,6 @@ class CountingErrorMeter(
             }
         }
     }
-
 
     fun onFailure() {
         val index = counter.getAndIncrement()

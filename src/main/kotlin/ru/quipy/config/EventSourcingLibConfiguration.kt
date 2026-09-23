@@ -14,7 +14,6 @@ import ru.quipy.payments.logic.PaymentAggregateState
 import ru.quipy.streams.AggregateEventStreamManager
 import java.util.*
 
-
 /**
  * This files contains some configurations that you might want to have in your project. Some configurations are
  * made in for the sake of demonstration and not required for the library functioning. Usually you can have even
@@ -37,7 +36,6 @@ import java.util.*
  */
 @Configuration
 class EventSourcingLibConfiguration {
-
     private val logger = LoggerFactory.getLogger(EventSourcingLibConfiguration::class.java)
 
     @Autowired

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service
 import ru.quipy.OnlineShopApplication.Companion.appExecutor
 import ru.quipy.orders.repository.OrderRepository
 import ru.quipy.payments.api.PaymentAggregate
-import ru.quipy.payments.api.PaymentProcessedEvent
+import ru.quipy.payments.api.domainevents.PaymentProcessedEvent
 import ru.quipy.streams.AggregateSubscriptionsManager
 import ru.quipy.streams.annotation.RetryConf
 import ru.quipy.streams.annotation.RetryFailedStrategy
@@ -18,7 +18,6 @@ import java.time.Duration
 class PaymentSubscriber {
 
     val logger: Logger = LoggerFactory.getLogger(PaymentSubscriber::class.java)
-
 
     @Autowired
     lateinit var subscriptionsManager: AggregateSubscriptionsManager
@@ -36,11 +35,15 @@ class PaymentSubscriber {
             `when`(PaymentProcessedEvent::class) { event ->
                 appExecutor.submit {
                     logger.trace(
-                        "Payment results. OrderId ${event.orderId}, succeeded: ${event.success}, txId: ${event.transactionId}, reason: ${event.reason}, duration: ${
-                            Duration.ofMillis(
-                                event.createdAt - event.submittedAt
-                            ).toSeconds()
-                        }, spent in queue: ${event.spentInQueueDuration.toSeconds()}"
+                        "Payment results. OrderId {}, succeeded: {}, txId: {}, reason: {}, duration: {}, spent in queue: {}",
+                        event.orderId,
+                        event.success,
+                        event.transactionId,
+                        event.reason,
+                        Duration.ofMillis(
+                            event.createdAt - event.submittedAt
+                        ).toSeconds(),
+                        event.spentInQueueDuration.toSeconds()
                     )
                 }
             }

@@ -1,4 +1,4 @@
-package ru.quipy.common.utils
+package ru.quipy.common.utils.ratelimiter.implementation
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -6,9 +6,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import ru.quipy.common.utils.ratelimiter.RateLimiter
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.milliseconds
 
 class TokenBucketRateLimiter(
     private val rate: Int,
@@ -21,7 +23,6 @@ class TokenBucketRateLimiter(
     }
 
     private val rateLimiterScope = CoroutineScope(Executors.newSingleThreadExecutor().asCoroutineDispatcher())
-
     private var bucket: AtomicInteger = AtomicInteger(0)
     private var start = System.currentTimeMillis()
     private var nextExpectedWakeUp = start + timeUnit.toMillis(window)
@@ -34,7 +35,7 @@ class TokenBucketRateLimiter(
             bucket.get().let { cur ->
                 bucket.addAndGet(if (cur + rate > bucketMaxCapacity) bucketMaxCapacity - cur else rate)
             }
-            delay(nextExpectedWakeUp - System.currentTimeMillis())
+            delay((nextExpectedWakeUp - System.currentTimeMillis()).milliseconds)
         }
     }.invokeOnCompletion { th -> if (th != null) logger.error("Rate limiter release job completed", th) }
 

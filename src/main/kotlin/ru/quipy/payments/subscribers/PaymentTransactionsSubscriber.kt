@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import ru.quipy.payments.api.PaymentAggregate
-import ru.quipy.payments.api.PaymentProcessedEvent
 import ru.quipy.streams.AggregateSubscriptionsManager
 import ru.quipy.streams.annotation.RetryConf
 import ru.quipy.streams.annotation.RetryFailedStrategy
@@ -13,6 +12,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import jakarta.annotation.PostConstruct
+import ru.quipy.payments.api.domainevents.PaymentProcessedEvent
 
 @Service
 class PaymentTransactionsSubscriber {
