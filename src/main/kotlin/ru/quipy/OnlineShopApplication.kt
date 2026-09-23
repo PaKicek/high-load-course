@@ -14,9 +14,10 @@ class OnlineShopApplication {
 
     companion object {
         val appExecutor = Executors.newFixedThreadPool(64, NamedThreadFactory("main-app-executor"))
-    }
-}
 
-fun main(args: Array<String>) {
-    runApplication<OnlineShopApplication>(*args)
+        @JvmStatic
+        fun main(args: Array<String>) {
+            runApplication<OnlineShopApplication>(*args)
+        }
+    }
 }

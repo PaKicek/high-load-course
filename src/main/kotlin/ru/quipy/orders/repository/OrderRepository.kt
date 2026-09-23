@@ -5,7 +5,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
-import ru.quipy.apigateway.APIController.Order
+import ru.quipy.orders.entities.Order
 import ru.quipy.streams.AggregateSubscriptionsManager
 import java.time.Duration
 import java.util.*
@@ -22,7 +22,6 @@ class OrderRepository {
         .maximumSize(100_000_000)
         .expireAfterWrite(Duration.ofHours(5))
         .build<UUID, Order?>()
-
 
     fun save(order: Order): Order {
         orderCache.put(order.id, order)

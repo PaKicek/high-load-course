@@ -8,6 +8,7 @@ import ru.quipy.common.utils.CallerBlockingRejectedExecutionHandler
 import ru.quipy.common.utils.NamedThreadFactory
 import ru.quipy.core.EventSourcingService
 import ru.quipy.payments.api.PaymentAggregate
+import ru.quipy.payments.logic.payment.service.PaymentService
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -15,7 +16,6 @@ import java.util.concurrent.TimeUnit
 
 @Service
 class OrderPayer {
-
     companion object {
         val logger: Logger = LoggerFactory.getLogger(OrderPayer::class.java)
     }
@@ -46,7 +46,7 @@ class OrderPayer {
                     amount
                 )
             }
-            logger.trace("Payment ${createdEvent.paymentId} for order $orderId created.")
+            logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
 
             paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
         }

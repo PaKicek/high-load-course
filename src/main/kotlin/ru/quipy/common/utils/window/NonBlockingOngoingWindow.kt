@@ -1,25 +1,8 @@
-package ru.quipy.common.utils
+package ru.quipy.common.utils.window
 
-import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
 
-class OngoingWindow(
-    maxWinSize: Int
-) {
-    private val window = Semaphore(maxWinSize)
-
-    fun acquire() {
-        window.acquire()
-    }
-
-    fun release() = window.release()
-
-    fun awaitingQueueSize() = window.queueLength
-}
-
-class NonBlockingOngoingWindow(
-    private val maxWinSize: Int
-) {
+class NonBlockingOngoingWindow(private val maxWinSize: Int) {
     private val winSize = AtomicInteger()
 
     fun putIntoWindow(): WindowResponse {
@@ -37,7 +20,6 @@ class NonBlockingOngoingWindow(
     }
 
     fun releaseWindow() = winSize.decrementAndGet()
-
 
     sealed class WindowResponse(val currentWinSize: Int) {
         public class Success(

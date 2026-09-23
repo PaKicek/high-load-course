@@ -4,13 +4,17 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.*
+import ru.quipy.payments.logic.entities.CreateUserRequest
+import ru.quipy.orders.entities.Order
+import ru.quipy.orders.entities.OrderStatus
+import ru.quipy.payments.logic.payment.entities.PaymentSubmissionDto
+import ru.quipy.payments.logic.entities.User
 import ru.quipy.orders.repository.OrderRepository
 import ru.quipy.payments.logic.OrderPayer
 import java.util.*
 
 @RestController
 class APIController {
-
     val logger: Logger = LoggerFactory.getLogger(APIController::class.java)
 
     @Autowired
@@ -24,10 +28,6 @@ class APIController {
         return User(UUID.randomUUID(), req.name)
     }
 
-    data class CreateUserRequest(val name: String, val password: String)
-
-    data class User(val id: UUID, val name: String)
-
     @PostMapping("/orders")
     fun createOrder(@RequestParam userId: UUID, @RequestParam price: Int): Order {
         val order = Order(
@@ -37,21 +37,8 @@ class APIController {
             OrderStatus.COLLECTING,
             price,
         )
+
         return orderRepository.save(order)
-    }
-
-    data class Order(
-        val id: UUID,
-        val userId: UUID,
-        val timeCreated: Long,
-        val status: OrderStatus,
-        val price: Int,
-    )
-
-    enum class OrderStatus {
-        COLLECTING,
-        PAYMENT_IN_PROGRESS,
-        PAID,
     }
 
     @PostMapping("/orders/{orderId}/payment")
@@ -62,13 +49,7 @@ class APIController {
             it
         } ?: throw IllegalArgumentException("No such order $orderId")
 
-
         val createdAt = orderPayer.processPayment(orderId, order.price, paymentId, deadline)
         return PaymentSubmissionDto(createdAt, paymentId)
     }
-
-    class PaymentSubmissionDto(
-        val timestamp: Long,
-        val transactionId: UUID
-    )
 }

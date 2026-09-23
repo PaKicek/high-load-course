@@ -1,4 +1,4 @@
-package ru.quipy.payments.logic
+package ru.quipy.payments.logic.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
@@ -8,25 +8,27 @@ import okhttp3.RequestBody
 import org.slf4j.LoggerFactory
 import ru.quipy.core.EventSourcingService
 import ru.quipy.payments.api.PaymentAggregate
+import ru.quipy.payments.logic.PaymentAggregateState
+import ru.quipy.payments.logic.entities.ExternalSysResponse
+import ru.quipy.payments.logic.payment.entities.PaymentAccountProperties
 import java.lang.Thread.sleep
 import java.net.SocketTimeoutException
 import java.time.Duration
 import java.util.*
 
-
 // Advice: always treat time as a Duration
-class PaymentExternalSystemAdapterImpl(
+class PaymentExternalServiceAdapterImpl(
     private val properties: PaymentAccountProperties,
     private val paymentESService: EventSourcingService<UUID, PaymentAggregate, PaymentAggregateState>,
     private val paymentProviderHostPort: String,
     private val token: String,
-) : PaymentExternalSystemAdapter {
-
+) : PaymentExternalServiceAdapter {
     companion object {
-        val logger = LoggerFactory.getLogger(PaymentExternalSystemAdapter::class.java)
-
+        val logger = LoggerFactory.getLogger(PaymentExternalServiceAdapter::class.java)
         val emptyBody = RequestBody.create(null, ByteArray(0))
         val mapper = ObjectMapper().registerKotlinModule()
+
+        public fun now() = System.currentTimeMillis()
     }
 
     private val serviceName = properties.serviceName
@@ -97,7 +99,6 @@ class PaymentExternalSystemAdapterImpl(
 
                 else -> {
                     logger.error("[$accountName] Payment failed for txId: $transactionId, payment: $paymentId", e)
-
                     paymentESService.update(paymentId) {
                         it.logProcessing(false, now(), transactionId, reason = e.message)
                     }
@@ -107,11 +108,6 @@ class PaymentExternalSystemAdapterImpl(
     }
 
     override fun price() = properties.price
-
     override fun isEnabled() = properties.enabled
-
     override fun name() = properties.accountName
-
 }
-
-public fun now() = System.currentTimeMillis()

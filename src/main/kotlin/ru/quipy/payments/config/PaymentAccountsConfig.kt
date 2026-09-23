@@ -9,12 +9,14 @@ import org.springframework.context.annotation.Configuration
 import ru.quipy.core.EventSourcingService
 import ru.quipy.payments.api.PaymentAggregate
 import ru.quipy.payments.logic.*
+import ru.quipy.payments.logic.payment.entities.PaymentAccountProperties
+import ru.quipy.payments.logic.payment.service.PaymentExternalServiceAdapter
+import ru.quipy.payments.logic.payment.service.PaymentExternalServiceAdapterImpl
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.*
-
 
 @Configuration
 class PaymentAccountsConfig {
@@ -36,7 +38,7 @@ class PaymentAccountsConfig {
     lateinit var allowedAccounts: List<String>
 
     @Bean
-    fun accountAdapters(paymentService: EventSourcingService<UUID, PaymentAggregate, PaymentAggregateState>): List<PaymentExternalSystemAdapter> {
+    fun accountAdapters(paymentService: EventSourcingService<UUID, PaymentAggregate, PaymentAggregateState>): List<PaymentExternalServiceAdapter> {
         val request = HttpRequest.newBuilder()
             .uri(URI("http://${paymentProviderHostPort}/external/accounts?serviceName=$serviceName&token=$token"))
             .GET()
@@ -53,7 +55,7 @@ class PaymentAccountsConfig {
             .map { it.copy(enabled = true) }
             .onEach(::println)
             .map {
-                PaymentExternalSystemAdapterImpl(
+                PaymentExternalServiceAdapterImpl(
                     it,
                     paymentService,
                     paymentProviderHostPort,
