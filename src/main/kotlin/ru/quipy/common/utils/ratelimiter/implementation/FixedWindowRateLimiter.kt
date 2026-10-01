@@ -60,5 +60,8 @@ class FixedWindowRateLimiter(
 
     override fun tick() = semaphore.tryAcquire()
 
-    fun tickBlocking() = semaphore.acquire()
+    override fun tickBlocking() = semaphore.acquire()
+
+    override fun tickBlocking(timeout: Duration): Boolean =
+        semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)
 }

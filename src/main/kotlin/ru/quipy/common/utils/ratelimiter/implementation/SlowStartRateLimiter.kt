@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import ru.quipy.common.utils.ratelimiter.RateLimiter
+import java.time.Duration
 import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -61,5 +62,8 @@ class SlowStartRateLimiter(
 
     override fun tick() = semaphore.tryAcquire()
 
-    fun tickBlocking() = semaphore.acquire()
+    override fun tickBlocking() = semaphore.acquire()
+
+    override fun tickBlocking(timeout: Duration): Boolean =
+        semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)
 }
