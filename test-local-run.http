@@ -19,13 +19,13 @@ Content-Type: application/json
 #  "testCount": 1200
 #}
 # hw-02
-#{
-#  "serviceName": "{{serviceName}}",
-#  "token": "{{token}}",
-#  "ratePerSecond": 2,
-#  "testCount": 100,
-#  "processingTimeMillis": 60000
-#}
+{
+  "serviceName": "{{serviceName}}",
+  "token": "{{token}}",
+  "ratePerSecond": 2,
+  "testCount": 100,
+  "processingTimeMillis": 60000
+}
 
 ### Stop running test to save time and resources
 # @timeout 120
