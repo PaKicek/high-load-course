@@ -20,8 +20,9 @@ class OrderPayer {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(OrderPayer::class.java)
 
-        private const val IN_FLIGHT_FACTOR = 0.9
-        private const val RETRY_AFTER_MS = 1000L
+        private const val IN_FLIGHT_FACTOR = 0.7
+        private const val MIN_RETRY_AFTER_MS = 500L
+        private const val MAX_RETRY_AFTER_MS = 5000L
     }
 
     @Autowired
@@ -62,7 +63,20 @@ class OrderPayer {
         return canAccept
     }
 
-    fun retryAfterMs(): Long = System.currentTimeMillis() + RETRY_AFTER_MS
+    fun retryAfterMs(deadline: Long): Long {
+        val remainingMs = deadline - System.currentTimeMillis()
+        if (remainingMs <= 0) return MIN_RETRY_AFTER_MS
+
+        val throughputPerMs = paymentService.totalThroughputPerMs()
+        if (throughputPerMs <= 0.0) return MIN_RETRY_AFTER_MS
+
+        val capacity = (throughputPerMs * remainingMs * IN_FLIGHT_FACTOR).toLong()
+        val inFlight = inFlightCount.get()
+        val excess = (inFlight - capacity).coerceAtLeast(1L)
+
+        val waitMs = (excess / throughputPerMs).toLong()
+        return waitMs.coerceIn(MIN_RETRY_AFTER_MS, MAX_RETRY_AFTER_MS)
+    }
 
     fun processPayment(orderId: UUID, amount: Int, paymentId: UUID, deadline: Long): Long {
         val createdAt = System.currentTimeMillis()
