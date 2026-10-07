@@ -2,11 +2,12 @@ package ru.quipy.payments.logic.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import org.slf4j.LoggerFactory
-import ru.quipy.common.utils.ratelimiter.implementation.FixedWindowRateLimiter
+import ru.quipy.common.utils.ratelimiter.implementation.SlidingWindowRateLimiter
 import ru.quipy.common.utils.window.OngoingWindow
 import ru.quipy.core.EventSourcingService
 import ru.quipy.payments.api.PaymentAggregate
@@ -31,6 +32,9 @@ class PaymentExternalServiceAdapterImpl(
         val mapper = ObjectMapper().registerKotlinModule()
 
         public fun now() = System.currentTimeMillis()
+
+        private const val RATE_LIMIT_BACKOFF_MS = 200L
+        private const val RETRY_BACKOFF_MS = 50L
     }
 
     private val serviceName = properties.serviceName
@@ -39,15 +43,19 @@ class PaymentExternalServiceAdapterImpl(
     private val rateLimitPerSec = properties.rateLimitPerSec
     private val parallelRequests = properties.parallelRequests
 
-    private val rateLimiter = FixedWindowRateLimiter(
-        rate = rateLimitPerSec,
-        window = 1,
-        timeUnit = TimeUnit.SECONDS,
+    private val rateLimiter = SlidingWindowRateLimiter(
+        rate = rateLimitPerSec.toLong(),
+        window = Duration.ofSeconds(1),
     )
 
     private val parallelWindow = OngoingWindow(parallelRequests)
 
-    private val client = OkHttpClient.Builder().build()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .readTimeout(Duration.ofSeconds(30))
+        .writeTimeout(Duration.ofSeconds(10))
+        .connectionPool(ConnectionPool(50, 5, TimeUnit.MINUTES))
+        .build()
 
     override fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long) {
         logger.warn("[$accountName] Submitting payment request for payment $paymentId")
@@ -82,12 +90,16 @@ class PaymentExternalServiceAdapterImpl(
             }
 
             val waitBudget = Duration.ofMillis(remaining)
-            if (!rateLimiter.tickBlocking(waitBudget)) {
-                logger.warn("[$accountName] Rate limit wait timeout for payment $paymentId, will retry")
-                continue
-            }
             if (!parallelWindow.tryAcquire(waitBudget)) {
                 logger.warn("[$accountName] Parallel limit wait timeout for payment $paymentId, will retry")
+                Thread.sleep(RETRY_BACKOFF_MS)
+                continue
+            }
+
+            if (!rateLimiter.tickBlocking(waitBudget)) {
+                logger.warn("[$accountName] Rate limit wait timeout for payment $paymentId, will retry")
+                parallelWindow.release()
+                Thread.sleep(RETRY_BACKOFF_MS)
                 continue
             }
 
@@ -111,6 +123,9 @@ class PaymentExternalServiceAdapterImpl(
                     } else {
                         lastReason = body.message
                         logger.warn("[$accountName] Payment returned false for txId: $transactionId, payment: $paymentId, message: ${body.message}. Will retry if time allows.")
+                        if (body.message?.contains("Rate limit", ignoreCase = true) == true) {
+                            Thread.sleep(RATE_LIMIT_BACKOFF_MS)
+                        }
                     }
                 }
             } catch (e: Exception) {
