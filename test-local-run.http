@@ -2,30 +2,6 @@
 POST http://localhost:1234/test/run
 Content-Type: application/json
 
-# Use example
-#{
-#  "serviceName": "{{serviceName}}",
-#  "token": "{{token}}",
-#  "ratePerSecond": 1,
-#  "testCount": 100,
-#  "processingTimeMillis": 80000
-#}
-
-# hw-01
-#{
-#  "serviceName": "{{serviceName}}",
-#  "token": "{{token}}",
-#  "ratePerSecond": 11,
-#  "testCount": 1200
-#}
-# hw-02
-#{
-#  "serviceName": "{{serviceName}}",
-#  "token": "{{token}}",
-#  "ratePerSecond": 2,
-#  "testCount": 100,
-#  "processingTimeMillis": 60000
-#}
 # hw-03
 {
   "serviceName": "{{serviceName}}",
