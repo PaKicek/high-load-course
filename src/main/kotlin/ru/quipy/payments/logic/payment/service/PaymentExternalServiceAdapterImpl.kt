@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tag
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -60,6 +61,8 @@ class PaymentExternalServiceAdapterImpl(
         .connectionPool(ConnectionPool(50, 5, TimeUnit.MINUTES))
         .build()
 
+    private val accountTag = Tag.of("account", accountName)
+
     private val incomingPaymentsCounter: Counter = Counter.builder("payment_incoming_total")
         .tag("account", accountName)
         .tag("service", serviceName)
@@ -77,6 +80,48 @@ class PaymentExternalServiceAdapterImpl(
         .tag("service", serviceName)
         .description("Total number of successfully processed payments")
         .register(meterRegistry)
+
+
+
+    private val parallelWaitCounter: Counter = Counter.builder("payment_parallel_wait_total")
+        .tag("account", accountName)
+        .description("Total number of attempts to acquire a parallel window slot")
+        .register(meterRegistry)
+
+    private val parallelTimeoutCounter: Counter = Counter.builder("payment_parallel_timeout_total")
+        .tag("account", accountName)
+        .description("Total number of failed attempts to acquire a parallel window slot")
+        .register(meterRegistry)
+
+    private val rateWaitCounter: Counter = Counter.builder("payment_rate_wait_total")
+        .tag("account", accountName)
+        .description("Total number of attempts to acquire a rate limiter permit")
+        .register(meterRegistry)
+
+    private val rateTimeoutCounter: Counter = Counter.builder("payment_rate_timeout_total")
+        .tag("account", accountName)
+        .description("Total number of failed attempts to acquire a rate limiter permit")
+        .register(meterRegistry)
+
+    init {
+        meterRegistry.gauge(
+            "payment_parallel_window_queue_size",
+            listOf(accountTag),
+            parallelWindow,
+        ) { it.awaitingQueueSize().toDouble() }
+
+        meterRegistry.gauge(
+            "payment_parallel_window_available_slots",
+            listOf(accountTag),
+            parallelWindow,
+        ) { it.availableSlots().toDouble() }
+
+        meterRegistry.gauge(
+            "payment_rate_limiter_current_count",
+            listOf(accountTag),
+            rateLimiter,
+        ) { it.currentCount().toDouble() }
+    }
 
     override fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long) {
         incomingPaymentsCounter.increment()
@@ -102,7 +147,6 @@ class PaymentExternalServiceAdapterImpl(
         while (true) {
             val nowMs = now()
             val remaining = deadline - nowMs
-
             if (remaining <= 0) {
                 val reason = lastReason ?: "Deadline exceeded"
                 logger.warn("[$accountName] Deadline exceeded for payment $paymentId, reason=$reason")
@@ -113,14 +157,17 @@ class PaymentExternalServiceAdapterImpl(
             }
 
             val waitBudget = Duration.ofMillis(remaining)
+            parallelWaitCounter.increment()
             if (!parallelWindow.tryAcquire(waitBudget)) {
                 logger.warn("[$accountName] Parallel limit wait timeout for payment $paymentId, will retry")
+                parallelTimeoutCounter.increment()
                 Thread.sleep(RETRY_BACKOFF_MS)
                 continue
             }
-
+            rateWaitCounter.increment()
             if (!rateLimiter.tickBlocking(waitBudget)) {
                 logger.warn("[$accountName] Rate limit wait timeout for payment $paymentId, will retry")
+                rateTimeoutCounter.increment()
                 parallelWindow.release()
                 Thread.sleep(RETRY_BACKOFF_MS)
                 continue
@@ -128,7 +175,6 @@ class PaymentExternalServiceAdapterImpl(
 
             try {
                 outgoingRequestsCounter.increment()
-
                 client.newCall(request).execute().use { response ->
                     val rawBody = response.body?.string()
                     val body = try {
@@ -141,7 +187,6 @@ class PaymentExternalServiceAdapterImpl(
 
                     if (body.result) {
                         succeededPaymentsCounter.increment()
-
                         logger.info("[$accountName] Payment processed for txId: $transactionId, payment: $paymentId, succeeded: true, message: ${body.message}")
                         paymentESService.update(paymentId) {
                             it.logProcessing(true, now(), transactionId, reason = body.message)
