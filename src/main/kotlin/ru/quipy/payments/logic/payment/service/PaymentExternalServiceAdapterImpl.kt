@@ -2,6 +2,8 @@ package ru.quipy.payments.logic.payment.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,6 +27,7 @@ class PaymentExternalServiceAdapterImpl(
     private val paymentESService: EventSourcingService<UUID, PaymentAggregate, PaymentAggregateState>,
     private val paymentProviderHostPort: String,
     private val token: String,
+    private val meterRegistry: MeterRegistry,
 ) : PaymentExternalServiceAdapter {
     companion object {
         val logger = LoggerFactory.getLogger(PaymentExternalServiceAdapter::class.java)
@@ -57,7 +60,27 @@ class PaymentExternalServiceAdapterImpl(
         .connectionPool(ConnectionPool(50, 5, TimeUnit.MINUTES))
         .build()
 
+    private val incomingPaymentsCounter: Counter = Counter.builder("payment_incoming_total")
+        .tag("account", accountName)
+        .tag("service", serviceName)
+        .description("Total number of incoming payment requests")
+        .register(meterRegistry)
+
+    private val outgoingRequestsCounter: Counter = Counter.builder("payment_outgoing_total")
+        .tag("account", accountName)
+        .tag("service", serviceName)
+        .description("Total number of outgoing HTTP requests to the payment provider")
+        .register(meterRegistry)
+
+    private val succeededPaymentsCounter: Counter = Counter.builder("payment_succeeded_total")
+        .tag("account", accountName)
+        .tag("service", serviceName)
+        .description("Total number of successfully processed payments")
+        .register(meterRegistry)
+
     override fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long) {
+        incomingPaymentsCounter.increment()
+
         logger.warn("[$accountName] Submitting payment request for payment $paymentId")
 
         val transactionId = UUID.randomUUID()
@@ -104,6 +127,8 @@ class PaymentExternalServiceAdapterImpl(
             }
 
             try {
+                outgoingRequestsCounter.increment()
+
                 client.newCall(request).execute().use { response ->
                     val rawBody = response.body?.string()
                     val body = try {
@@ -115,6 +140,8 @@ class PaymentExternalServiceAdapterImpl(
                     }
 
                     if (body.result) {
+                        succeededPaymentsCounter.increment()
+
                         logger.info("[$accountName] Payment processed for txId: $transactionId, payment: $paymentId, succeeded: true, message: ${body.message}")
                         paymentESService.update(paymentId) {
                             it.logProcessing(true, now(), transactionId, reason = body.message)
