@@ -22,7 +22,6 @@ import java.time.Duration
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-// Advice: always treat time as a Duration
 class PaymentExternalServiceAdapterImpl(
     private val properties: PaymentAccountProperties,
     private val paymentESService: EventSourcingService<UUID, PaymentAggregate, PaymentAggregateState>,
@@ -85,21 +84,25 @@ class PaymentExternalServiceAdapterImpl(
 
     private val parallelWaitCounter: Counter = Counter.builder("payment_parallel_wait_total")
         .tag("account", accountName)
+        .tag("service", serviceName)
         .description("Total number of attempts to acquire a parallel window slot")
         .register(meterRegistry)
 
     private val parallelTimeoutCounter: Counter = Counter.builder("payment_parallel_timeout_total")
         .tag("account", accountName)
+        .tag("service", serviceName)
         .description("Total number of failed attempts to acquire a parallel window slot")
         .register(meterRegistry)
 
     private val rateWaitCounter: Counter = Counter.builder("payment_rate_wait_total")
         .tag("account", accountName)
+        .tag("service", serviceName)
         .description("Total number of attempts to acquire a rate limiter permit")
         .register(meterRegistry)
 
     private val rateTimeoutCounter: Counter = Counter.builder("payment_rate_timeout_total")
         .tag("account", accountName)
+        .tag("service", serviceName)
         .description("Total number of failed attempts to acquire a rate limiter permit")
         .register(meterRegistry)
 
@@ -130,8 +133,6 @@ class PaymentExternalServiceAdapterImpl(
 
         val transactionId = UUID.randomUUID()
 
-        // Вне зависимости от исхода оплаты важно отметить что она была отправлена.
-        // Это требуется сделать ВО ВСЕХ СЛУЧАЯХ, поскольку эта информация используется сервисом тестирования.
         paymentESService.update(paymentId) {
             it.logSubmission(success = true, transactionId, now(), Duration.ofMillis(now() - paymentStartedAt))
         }
