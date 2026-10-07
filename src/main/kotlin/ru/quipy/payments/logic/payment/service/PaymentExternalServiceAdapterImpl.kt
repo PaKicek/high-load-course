@@ -220,5 +220,6 @@ class PaymentExternalServiceAdapterImpl(
 
     override fun price() = properties.price
     override fun isEnabled() = properties.enabled
+    override fun throughputPerMs()= parallelRequests.toDouble() / requestAverageProcessingTime.toMillis().toDouble()
     override fun name() = properties.accountName
 }

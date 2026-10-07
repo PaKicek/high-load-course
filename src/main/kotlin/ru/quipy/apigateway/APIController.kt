@@ -51,7 +51,7 @@ class APIController {
             it
         } ?: throw IllegalArgumentException("No such order $orderId")
 
-        if (!orderPayer.canAcceptPayment()) {
+        if (!orderPayer.canAcceptPayment(deadline)) {
             val retryAfter = orderPayer.retryAfterMs()
             logger.warn("Rejecting payment for order $orderId with 429, Retry-After=$retryAfter")
             return ResponseEntity
