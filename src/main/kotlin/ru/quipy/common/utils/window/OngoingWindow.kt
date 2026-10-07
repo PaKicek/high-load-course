@@ -22,4 +22,6 @@ class OngoingWindow(maxWinSize: Int) {
     fun release() = window.release()
 
     fun awaitingQueueSize() = window.queueLength
+
+    fun availableSlots(): Int = window.availablePermits()
 }

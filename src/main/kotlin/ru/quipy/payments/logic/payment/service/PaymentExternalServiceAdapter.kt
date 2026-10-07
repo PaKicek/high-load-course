@@ -12,4 +12,5 @@ interface PaymentExternalServiceAdapter {
     fun name(): String
     fun price(): Int
     fun isEnabled(): Boolean
+    fun throughputPerMs(): Double
 }

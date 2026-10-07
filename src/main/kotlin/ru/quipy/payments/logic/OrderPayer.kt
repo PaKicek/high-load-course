@@ -13,11 +13,16 @@ import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @Service
 class OrderPayer {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(OrderPayer::class.java)
+
+        private const val IN_FLIGHT_FACTOR = 0.7
+        private const val MIN_RETRY_AFTER_MS = 500L
+        private const val MAX_RETRY_AFTER_MS = 5000L
     }
 
     @Autowired
@@ -36,19 +41,60 @@ class OrderPayer {
         CallerBlockingRejectedExecutionHandler()
     )
 
+    private val inFlightCount = AtomicInteger(0)
+
+    fun canAcceptPayment(deadline: Long): Boolean {
+        val remainingMs = deadline - System.currentTimeMillis()
+        if (remainingMs <= 0) return false
+
+        val throughputPerMs = paymentService.totalThroughputPerMs()
+        if (throughputPerMs <= 0.0) return false
+
+        val capacity = (throughputPerMs * remainingMs * IN_FLIGHT_FACTOR).toLong()
+        val current = inFlightCount.get()
+
+        val canAccept = current < capacity
+        if (!canAccept) {
+            logger.debug(
+                "Rejecting payment: inFlight={}, capacity={}, remainingMs={}, throughputPerMs={}",
+                current, capacity, remainingMs, throughputPerMs
+            )
+        }
+        return canAccept
+    }
+
+    fun retryAfterMs(deadline: Long): Long {
+        val remainingMs = deadline - System.currentTimeMillis()
+        if (remainingMs <= 0) return MIN_RETRY_AFTER_MS
+
+        val throughputPerMs = paymentService.totalThroughputPerMs()
+        if (throughputPerMs <= 0.0) return MIN_RETRY_AFTER_MS
+
+        val capacity = (throughputPerMs * remainingMs * IN_FLIGHT_FACTOR).toLong()
+        val inFlight = inFlightCount.get()
+        val excess = (inFlight - capacity).coerceAtLeast(1L)
+
+        val waitMs = (excess / throughputPerMs).toLong()
+        return waitMs.coerceIn(MIN_RETRY_AFTER_MS, MAX_RETRY_AFTER_MS)
+    }
+
     fun processPayment(orderId: UUID, amount: Int, paymentId: UUID, deadline: Long): Long {
         val createdAt = System.currentTimeMillis()
+        inFlightCount.incrementAndGet()
         paymentExecutor.submit {
-            val createdEvent = paymentESService.create {
-                it.create(
-                    paymentId,
-                    orderId,
-                    amount
-                )
+            try {
+                val createdEvent = paymentESService.create {
+                    it.create(
+                        paymentId,
+                        orderId,
+                        amount
+                    )
+                }
+                logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
+                paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
+            } finally {
+                inFlightCount.decrementAndGet()
             }
-            logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
-
-            paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
         }
         return createdAt
     }

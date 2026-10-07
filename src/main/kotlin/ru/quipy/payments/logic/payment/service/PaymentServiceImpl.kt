@@ -17,4 +17,10 @@ class PaymentServiceImpl(
             account.performPaymentAsync(paymentId, amount, paymentStartedAt, deadline)
         }
     }
+
+    override fun totalThroughputPerMs(): Double {
+        return paymentAccounts
+            .filter { it.isEnabled() }
+            .sumOf { it.throughputPerMs() }
+    }
 }
