@@ -32,10 +32,7 @@ class OrderPayer {
     private lateinit var paymentService: PaymentService
 
     private val paymentExecutor = ThreadPoolExecutor(
-        16,
-        16,
-        0L,
-        TimeUnit.MILLISECONDS,
+        16, 16, 0L, TimeUnit.MILLISECONDS,
         LinkedBlockingQueue(8_000),
         NamedThreadFactory("payment-submission-executor"),
         CallerBlockingRejectedExecutionHandler()
@@ -43,24 +40,18 @@ class OrderPayer {
 
     private val inFlightCount = AtomicInteger(0)
 
-    fun canAcceptPayment(deadline: Long): Boolean {
+    fun tryReserveSlot(deadline: Long): Boolean {
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return false
-
         val throughputPerMs = paymentService.totalThroughputPerMs()
         if (throughputPerMs <= 0.0) return false
-
         val capacity = (throughputPerMs * remainingMs * IN_FLIGHT_FACTOR).toLong()
-        val current = inFlightCount.get()
-
-        val canAccept = current < capacity
-        if (!canAccept) {
-            logger.debug(
-                "Rejecting payment: inFlight={}, capacity={}, remainingMs={}, throughputPerMs={}",
-                current, capacity, remainingMs, throughputPerMs
-            )
+        if (capacity <= 0) return false
+        while (true) {
+            val current = inFlightCount.get()
+            if (current >= capacity) return false
+            if (inFlightCount.compareAndSet(current, current + 1)) return true
         }
-        return canAccept
     }
 
     fun retryAfterMs(deadline: Long): Long {
@@ -80,21 +71,21 @@ class OrderPayer {
 
     fun processPayment(orderId: UUID, amount: Int, paymentId: UUID, deadline: Long): Long {
         val createdAt = System.currentTimeMillis()
-        inFlightCount.incrementAndGet()
-        paymentExecutor.submit {
-            try {
-                val createdEvent = paymentESService.create {
-                    it.create(
-                        paymentId,
-                        orderId,
-                        amount
-                    )
+        try {
+            paymentExecutor.submit {
+                try {
+                    val createdEvent = paymentESService.create {
+                        it.create(paymentId, orderId, amount)
+                    }
+                    logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
+                    paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
+                } finally {
+                    inFlightCount.decrementAndGet()
                 }
-                logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
-                paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
-            } finally {
-                inFlightCount.decrementAndGet()
             }
+        } catch (e: Exception) {
+            inFlightCount.decrementAndGet()
+            throw e
         }
         return createdAt
     }
