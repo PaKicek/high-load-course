@@ -9,4 +9,5 @@ interface PaymentService {
     fun submitPaymentRequest(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long)
 
     fun totalThroughputPerMs(): Double
+    fun averageProcessingTimeMs(): Long
 }
