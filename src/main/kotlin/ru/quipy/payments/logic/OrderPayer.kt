@@ -23,7 +23,7 @@ class OrderPayer {
         private const val IN_FLIGHT_FACTOR = 0.3
         private const val MIN_RETRY_AFTER_MS = 500L
         private const val MAX_RETRY_AFTER_MS = 500L
-        private const val PAYMENT_EXECUTOR_THREADS = 128
+        private const val PAYMENT_EXECUTOR_THREADS = 256
     }
 
     @Autowired
