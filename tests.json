@@ -19,8 +19,22 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
-    "hw-05": {
-
+    "hw-05-1": {
+      "ratePerSecond": 15,
+      "testCount": 3000,
+      "processingTimeMillis": 2500
+    },
+    "hw-05-2": {
+      "ratePerSecond": 11,
+      "testCount": 2200,
+      "processingTimeMillis": 13000,
+      "profile": "s_0.7_60"
+    },
+    "hw-05-3": {
+      "ratePerSecond": 3,
+      "testCount": 1050,
+      "processingTimeMillis": 26000,
+      "runits": 90
     },
     "hw-06": {
 
@@ -85,9 +99,28 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
-    "hw-05": {
+    "hw-05-1": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 15,
+      "testCount": 3000,
+      "processingTimeMillis": 2500
+    },
+    "hw-05-2": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "ratePerSecond": 11,
+      "testCount": 2200,
+      "processingTimeMillis": 13000,
+      "profile": "s_0.7_60"
+    },
+    "hw-05-3": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "ratePerSecond": 3,
+      "testCount": 1050,
+      "processingTimeMillis": 26000,
+      "runits": 90
     },
     "hw-06": {
       "serviceName": "{{serviceName}}",
@@ -172,10 +205,34 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
-    "hw-05": {
+    "hw-05-1": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-05"
+      "branch": "hw-05",
+      "accounts": "acc-23",
+      "ratePerSecond": 15,
+      "testCount": 3000,
+      "processingTimeMillis": 2500
+    },
+    "hw-05-2": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "branch": "hw-05",
+      "accounts": "acc-23",
+      "ratePerSecond": 11,
+      "testCount": 2200,
+      "processingTimeMillis": 13000,
+      "profile": "s_0.7_60"
+    },
+    "hw-05-3": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "branch": "hw-05",
+      "accounts": "acc-23",
+      "ratePerSecond": 3,
+      "testCount": 1050,
+      "processingTimeMillis": 26000,
+      "runits": 90
     },
     "hw-06": {
       "serviceName": "{{serviceName}}",
