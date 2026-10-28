@@ -220,7 +220,13 @@ class PaymentExternalServiceAdapterImpl(
 
     override fun price() = properties.price
     override fun isEnabled() = properties.enabled
-    override fun throughputPerMs()= parallelRequests.toDouble() / requestAverageProcessingTime.toMillis().toDouble()
+    override fun throughputPerMs(): Double {
+        val accountThroughputRps = minOf(
+            rateLimitPerSec.toDouble(),
+            parallelRequests.toDouble() / requestAverageProcessingTime.toMillis() * 1000.0
+        )
+        return accountThroughputRps / 1000.0
+    }
     override fun averageProcessingTimeMs(): Long = requestAverageProcessingTime.toMillis()
     override fun name() = properties.accountName
 }

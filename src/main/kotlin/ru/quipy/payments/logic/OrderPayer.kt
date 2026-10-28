@@ -11,6 +11,7 @@ import ru.quipy.payments.api.PaymentAggregate
 import ru.quipy.payments.logic.payment.service.PaymentService
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -20,10 +21,12 @@ class OrderPayer {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(OrderPayer::class.java)
 
-        private const val IN_FLIGHT_FACTOR = 0.3
-        private const val MIN_RETRY_AFTER_MS = 500L
-        private const val MAX_RETRY_AFTER_MS = 500L
-        private const val PAYMENT_EXECUTOR_THREADS = 256
+        private const val IN_FLIGHT_FACTOR = 0.6
+        private const val MIN_RETRY_AFTER_MS = 200L
+        private const val MAX_RETRY_AFTER_MS = 200L
+        private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
+        private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
+        private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
     }
 
     @Autowired
@@ -33,9 +36,9 @@ class OrderPayer {
     private lateinit var paymentService: PaymentService
 
     private val paymentExecutor = ThreadPoolExecutor(
-        PAYMENT_EXECUTOR_THREADS,
-        PAYMENT_EXECUTOR_THREADS,
-        0L,
+        PAYMENT_CORE_EXECUTOR_THREADS,
+        PAYMENT_MAX_EXECUTOR_THREADS,
+        PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS,
         TimeUnit.MILLISECONDS,
         LinkedBlockingQueue(8_000),
         NamedThreadFactory("payment-submission-executor"),
@@ -49,14 +52,11 @@ class OrderPayer {
         if (remainingMs <= 0) return false
         val throughputPerMs = paymentService.totalThroughputPerMs()
         if (throughputPerMs <= 0.0) return false
+        val avgProcessingMs = paymentService.averageProcessingTimeMs()
+        if (avgProcessingMs <= 0) return false
 
         val accountCapacity = (throughputPerMs * remainingMs).toLong()
-        val avgProcessingMs = paymentService.averageProcessingTimeMs()
-        val executorCapacity = if (avgProcessingMs > 0) {
-            PAYMENT_EXECUTOR_THREADS * remainingMs / avgProcessingMs
-        } else {
-            accountCapacity
-        }
+        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * remainingMs / avgProcessingMs
 
         val capacity = (minOf(accountCapacity, executorCapacity) * IN_FLIGHT_FACTOR).toLong()
         if (capacity <= 0) return false
@@ -71,24 +71,20 @@ class OrderPayer {
     fun retryAfterMs(deadline: Long): Long {
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return MIN_RETRY_AFTER_MS
-
         val throughputPerMs = paymentService.totalThroughputPerMs()
         if (throughputPerMs <= 0.0) return MIN_RETRY_AFTER_MS
-
         val avgProcessingMs = paymentService.averageProcessingTimeMs()
+        if (avgProcessingMs <= 0) return MIN_RETRY_AFTER_MS
+
         val accountCapacity = (throughputPerMs * remainingMs).toLong()
-        val executorCapacity = if (avgProcessingMs > 0) {
-            PAYMENT_EXECUTOR_THREADS * remainingMs / avgProcessingMs
-        } else {
-            accountCapacity
-        }
+        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * remainingMs / avgProcessingMs
 
         val capacity = (minOf(accountCapacity, executorCapacity) * IN_FLIGHT_FACTOR).toLong()
         val excess = (inFlightCount.get() - capacity).coerceAtLeast(1L)
         val waitMs = (excess / throughputPerMs).toLong()
 
         val maxAllowed = (remainingMs - 200L).coerceAtLeast(MIN_RETRY_AFTER_MS)
-        return waitMs.coerceIn(MIN_RETRY_AFTER_MS, minOf(MAX_RETRY_AFTER_MS, maxAllowed))
+        return waitMs.coerceIn(MIN_RETRY_AFTER_MS, minOf(MAX_RETRY_AFTER_MS, maxAllowed)) + ThreadLocalRandom.current().nextLong(0L, 100L)
     }
 
     fun processPayment(orderId: UUID, amount: Int, paymentId: UUID, deadline: Long): Long {
