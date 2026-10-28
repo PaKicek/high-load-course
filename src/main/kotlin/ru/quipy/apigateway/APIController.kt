@@ -51,7 +51,7 @@ class APIController {
             it
         } ?: throw IllegalArgumentException("No such order $orderId")
 
-        if (!orderPayer.canAcceptPayment(deadline)) {
+        if (!orderPayer.tryReserveSlot(deadline)) {
             val retryAfter = orderPayer.retryAfterMs(deadline)
             logger.warn("Rejecting payment for order $orderId with 429, Retry-After=$retryAfter")
             return ResponseEntity
@@ -59,7 +59,6 @@ class APIController {
                 .header("Retry-After", retryAfter.toString())
                 .build()
         }
-
         val createdAt = orderPayer.processPayment(orderId, order.price, paymentId, deadline)
         return ResponseEntity.ok(PaymentSubmissionDto(createdAt, paymentId))
     }

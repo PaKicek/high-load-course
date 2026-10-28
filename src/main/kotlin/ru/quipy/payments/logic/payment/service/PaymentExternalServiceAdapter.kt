@@ -13,4 +13,5 @@ interface PaymentExternalServiceAdapter {
     fun price(): Int
     fun isEnabled(): Boolean
     fun throughputPerMs(): Double
+    fun averageProcessingTimeMs(): Long
 }

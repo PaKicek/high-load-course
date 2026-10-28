@@ -23,4 +23,10 @@ class PaymentServiceImpl(
             .filter { it.isEnabled() }
             .sumOf { it.throughputPerMs() }
     }
+
+    override fun averageProcessingTimeMs(): Long {
+        val accounts = paymentAccounts.filter { it.isEnabled() }
+        if (accounts.isEmpty()) return 1000L
+        return accounts.maxOf { it.averageProcessingTimeMs() }
+    }
 }

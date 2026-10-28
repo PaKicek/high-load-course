@@ -34,7 +34,7 @@ class PaymentExternalServiceAdapterImpl(
         val emptyBody = RequestBody.create(null, ByteArray(0))
         val mapper = ObjectMapper().registerKotlinModule()
 
-        public fun now() = System.currentTimeMillis()
+        fun now() = System.currentTimeMillis()
 
         private const val RATE_LIMIT_BACKOFF_MS = 200L
         private const val RETRY_BACKOFF_MS = 50L
@@ -220,6 +220,13 @@ class PaymentExternalServiceAdapterImpl(
 
     override fun price() = properties.price
     override fun isEnabled() = properties.enabled
-    override fun throughputPerMs()= parallelRequests.toDouble() / requestAverageProcessingTime.toMillis().toDouble()
+    override fun throughputPerMs(): Double {
+        val accountThroughputRps = minOf(
+            rateLimitPerSec.toDouble(),
+            parallelRequests.toDouble() / requestAverageProcessingTime.toMillis() * 1000.0
+        )
+        return accountThroughputRps / 1000.0
+    }
+    override fun averageProcessingTimeMs(): Long = requestAverageProcessingTime.toMillis()
     override fun name() = properties.accountName
 }
