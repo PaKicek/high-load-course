@@ -9,28 +9,43 @@ import org.slf4j.LoggerFactory
 import ru.quipy.common.utils.ratelimiter.RateLimiter
 import java.time.Duration
 import java.util.concurrent.Executors
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
 
 class LeakingBucketRateLimiter(
     private val rate: Long,
     private val window: Duration,
-    bucketSize: Int,
+    private val bucketSize: Int,
 ) : RateLimiter {
     private val rateLimiterScope = CoroutineScope(Executors.newSingleThreadExecutor().asCoroutineDispatcher())
-    private val queue = LinkedBlockingQueue<Int>(bucketSize)
     private val releaseIntervalMs = window.toMillis() / rate
+    private val semaphore = Semaphore(bucketSize)
 
-    override fun currentCount(): Long = queue.size.toLong()
-
-    override fun tick(): Boolean {
-        return queue.offer(1)
+    init {
+        repeat(bucketSize) {
+            semaphore.acquireUninterruptibly()
+        }
     }
+
+    override fun currentCount(): Long = (bucketSize - semaphore.availablePermits()).toLong()
+
+    override fun tick(): Boolean = semaphore.tryAcquire()
+
+    override fun tickBlocking() = semaphore.acquireUninterruptibly()
+
+    override fun tickBlocking(timeout: Duration): Boolean =
+        try {
+            semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
 
     private val releaseJob = rateLimiterScope.launch {
         while (true) {
             delay(releaseIntervalMs.milliseconds)
-            queue.poll()
+            semaphore.release()
         }
     }.invokeOnCompletion { th -> if (th != null) logger.error("Rate limiter release job completed", th) }
 
