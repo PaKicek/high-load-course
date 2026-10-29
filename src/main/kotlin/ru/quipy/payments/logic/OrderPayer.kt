@@ -6,12 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import ru.quipy.common.utils.CallerBlockingRejectedExecutionHandler
 import ru.quipy.common.utils.NamedThreadFactory
-import ru.quipy.common.utils.ratelimiter.RateLimiter
-import ru.quipy.common.utils.ratelimiter.implementation.LeakingBucketRateLimiter
 import ru.quipy.core.EventSourcingService
 import ru.quipy.payments.api.PaymentAggregate
 import ru.quipy.payments.logic.payment.service.PaymentService
-import java.time.Duration
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadLocalRandom
@@ -30,9 +27,6 @@ class OrderPayer {
         private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
         private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
-
-        private const val INGRESS_RATE_PER_SEC = 11L
-        private const val INGRESS_BUCKET_SIZE = 30
     }
 
     @Autowired
@@ -53,15 +47,7 @@ class OrderPayer {
 
     private val inFlightCount = AtomicInteger(0)
 
-    private val ingressRateLimiter: RateLimiter = LeakingBucketRateLimiter(
-        rate = INGRESS_RATE_PER_SEC,
-        window = Duration.ofSeconds(1),
-        bucketSize = INGRESS_BUCKET_SIZE,
-    )
-
     fun tryReserveSlot(deadline: Long): Boolean {
-        if (!ingressRateLimiter.tick()) return false
-
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return false
         val throughputPerMs = paymentService.totalThroughputPerMs()
