@@ -19,4 +19,6 @@ interface RateLimiter {
         }
         return tick()
     }
+
+    fun currentCount(): Long = 0L
 }
