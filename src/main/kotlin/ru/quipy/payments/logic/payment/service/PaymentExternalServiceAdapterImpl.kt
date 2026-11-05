@@ -196,15 +196,9 @@ class PaymentExternalServiceAdapterImpl(
                     } else {
                         lastReason = body.message
                         val isRateLimit = body.message?.contains("Rate limit", ignoreCase = true) == true
-                        if (isRateLimit) {
-                            logger.warn("[$accountName] Rate limit from provider for txId: $transactionId, payment: $paymentId, message: ${body.message}. Will retry after backoff.")
+                        logger.warn("[$accountName] Payment returned false for txId: $transactionId, payment: $paymentId, message: ${body.message}. Will retry if time allows.")
+                        if (body.message?.contains("Rate limit", ignoreCase = true) == true) {
                             Thread.sleep(RATE_LIMIT_BACKOFF_MS)
-                        } else {
-                            logger.warn("[$accountName] Payment returned false (non-retryable) for txId: $transactionId, payment: $paymentId, message: ${body.message}")
-                            paymentESService.update(paymentId) {
-                                it.logProcessing(false, now(), transactionId, reason = body.message)
-                            }
-                            return
                         }
                     }
                 }

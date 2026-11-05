@@ -60,7 +60,7 @@ class OrderPayer {
     )
 
     fun tryReserveSlot(deadline: Long): Boolean {
-        // if (!ingressRateLimiter.tick()) return false
+        if (!ingressRateLimiter.tick()) return false
 
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return false
