@@ -13,7 +13,7 @@
     },
     "annotations": {
       "grafana.app/createdBy": "access-policy:service",
-      "grafana.app/folder": "bfyy2vqe5ue4gb",
+      "grafana.app/folder": "fg3cbsbj8b1fkc",
       "grafana.app/managedBy": "classic-file-provisioning",
       "grafana.app/managerId": "Default",
       "grafana.app/sourceChecksum": "95da543fdb023c57c48ea0f752cb484d",
@@ -22,7 +22,7 @@
       "grafana.app/updatedBy": "access-policy:service",
       "grafana.app/updatedTimestamp": "2026-10-07T01:07:47Z",
       "grafana.app/folderTitle": "bombardier",
-      "grafana.app/folderUrl": "/dashboards/f/bfyy2vqe5ue4gb/bombardier"
+      "grafana.app/folderUrl": "/dashboards/f/fg3cbsbj8b1fkc/bombardier"
     }
   },
   "spec": {

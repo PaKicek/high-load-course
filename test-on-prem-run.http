@@ -3,15 +3,15 @@
 POST http://77.234.215.138:34321/run
 Content-Type: application/json
 
-# hw-05-1
+# hw-06
 {
   "serviceName": "{{serviceName}}",
   "token": "{{token}}",
-  "branch": "hw-05",
-  "accounts": "acc-23",
-  "ratePerSecond": 15,
-  "testCount": 3000,
-  "processingTimeMillis": 2500
+  "branch": "hw-06",
+  "accounts": "acc-8",
+  "ratePerSecond": 7,
+  "testCount": 800,
+  "processingTimeMillis": 3500
 }
 
 ### Stop running test to save credits
