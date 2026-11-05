@@ -123,7 +123,6 @@ class OrderPayer {
         deadline: Long,
         attempt: Int,
     ) {
-        var slotReleased = false
         try {
             if (attempt == 0) {
                 val createdEvent = paymentESService.create {
@@ -138,14 +137,12 @@ class OrderPayer {
                     it.logProcessing(false, System.currentTimeMillis(), null, reason = "Deadline exceeded")
                 }
                 releaseSlot()
-                slotReleased = true
                 return
             }
 
             val completed = paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline, attempt)
             if (completed) {
                 releaseSlot()
-                slotReleased = true
                 return
             }
 
@@ -155,7 +152,6 @@ class OrderPayer {
                     it.logProcessing(false, System.currentTimeMillis(), null, reason = "Temporary error retries exhausted")
                 }
                 releaseSlot()
-                slotReleased = true
                 return
             }
 
@@ -170,7 +166,6 @@ class OrderPayer {
                     it.logProcessing(false, System.currentTimeMillis(), null, reason = "Retry scheduling failed: ${e.message}")
                 }
                 releaseSlot()
-                slotReleased = true
             }
         } catch (e: Exception) {
             logger.error("Payment {} attempt={} failed with exception", paymentId, attempt, e)
@@ -180,7 +175,6 @@ class OrderPayer {
                 }
             }
             releaseSlot()
-            slotReleased = true
         }
     }
 
