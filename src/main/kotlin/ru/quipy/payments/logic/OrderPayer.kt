@@ -33,6 +33,7 @@ class OrderPayer {
 
         private const val INGRESS_RATE_PER_SEC = 11L
         private const val INGRESS_BUCKET_SIZE = 33
+        private const val MAX_TEMPORARY_ATTEMPTS = 1
     }
 
     @Autowired
@@ -105,20 +106,85 @@ class OrderPayer {
         val createdAt = System.currentTimeMillis()
         try {
             paymentExecutor.submit {
-                try {
-                    val createdEvent = paymentESService.create {
-                        it.create(paymentId, orderId, amount)
-                    }
-                    logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
-                    paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
-                } finally {
-                    inFlightCount.decrementAndGet()
-                }
+                runPaymentAttempt(paymentId, orderId, amount, createdAt, deadline, attempt = 0)
             }
         } catch (e: Exception) {
             inFlightCount.decrementAndGet()
             throw e
         }
         return createdAt
+    }
+
+    private fun runPaymentAttempt(
+        paymentId: UUID,
+        orderId: UUID,
+        amount: Int,
+        createdAt: Long,
+        deadline: Long,
+        attempt: Int,
+    ) {
+        var slotReleased = false
+        try {
+            if (attempt == 0) {
+                val createdEvent = paymentESService.create {
+                    it.create(paymentId, orderId, amount)
+                }
+                logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
+            }
+
+            if (System.currentTimeMillis() >= deadline) {
+                logger.warn("Payment {} deadline exceeded before attempt={}", paymentId, attempt)
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Deadline exceeded")
+                }
+                releaseSlot()
+                slotReleased = true
+                return
+            }
+
+            val completed = paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline, attempt)
+            if (completed) {
+                releaseSlot()
+                slotReleased = true
+                return
+            }
+
+            if (attempt >= MAX_TEMPORARY_ATTEMPTS) {
+                logger.warn("Payment {} temporary retries exhausted (attempt={})", paymentId, attempt)
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Temporary error retries exhausted")
+                }
+                releaseSlot()
+                slotReleased = true
+                return
+            }
+
+            logger.info("Payment {} scheduling retry (attempt={} -> {})", paymentId, attempt, attempt + 1)
+            try {
+                paymentExecutor.submit {
+                    runPaymentAttempt(paymentId, orderId, amount, createdAt, deadline, attempt + 1)
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to schedule retry for payment $paymentId", e)
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Retry scheduling failed: ${e.message}")
+                }
+                releaseSlot()
+                slotReleased = true
+            }
+        } catch (e: Exception) {
+            logger.error("Payment {} attempt={} failed with exception", paymentId, attempt, e)
+            runCatching {
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = e.message ?: "Unknown error")
+                }
+            }
+            releaseSlot()
+            slotReleased = true
+        }
+    }
+
+    private fun releaseSlot() {
+        inFlightCount.decrementAndGet()
     }
 }
