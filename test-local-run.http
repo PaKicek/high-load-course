@@ -2,7 +2,7 @@
 POST http://localhost:1234/test/run
 Content-Type: application/json
 
-# hw-06 PaymentAccountProperties(serviceName=cap-m3400-02, accountName=acc-8, parallelRequests=50, rateLimitPerSec=10, price=30, averageProcessingTime=PT0.7S, enabled=true)
+# hw-06
 {
   "serviceName": "{{serviceName}}",
   "token": "{{token}}",
