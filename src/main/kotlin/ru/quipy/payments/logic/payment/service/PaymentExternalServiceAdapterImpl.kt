@@ -36,7 +36,8 @@ class PaymentExternalServiceAdapterImpl(
 
         fun now() = System.currentTimeMillis()
 
-        private const val RATE_LIMIT_BACKOFF_MS = 200L
+        private const val RATE_LIMIT_BACKOFF_BASE_MS = 200L
+        private const val RATE_LIMIT_BACKOFF_MAX_MS = 2000L
         private const val RETRY_BACKOFF_MS = 50L
         private const val MAX_TEMPORARY_RETRIES = 1
     }
@@ -151,6 +152,7 @@ class PaymentExternalServiceAdapterImpl(
         logger.info("[$accountName] Submit: $paymentId , txId: $transactionId, attempt=$attempt")
 
         var lastReason: String? = null
+        var rateLimitAttempts = 0
         val request = Request.Builder().run {
             url("http://$paymentProviderHostPort/external/process?serviceName=$serviceName&token=$token&accountName=$accountName&transactionId=$transactionId&paymentId=$paymentId&amount=$amount")
             post(emptyBody)
@@ -212,8 +214,13 @@ class PaymentExternalServiceAdapterImpl(
                     val isTemporary = msg.contains("Temporary error", ignoreCase = true)
                     when {
                         isRateLimit -> {
-                            logger.warn("[$accountName] Rate limit from provider for txId: $transactionId, payment: $paymentId, message: $msg. Will retry after backoff (in-place).")
-                            Thread.sleep(RATE_LIMIT_BACKOFF_MS)
+                            val backoffMs = minOf(
+                                RATE_LIMIT_BACKOFF_BASE_MS * (1L shl rateLimitAttempts.coerceAtMost(3)),
+                                RATE_LIMIT_BACKOFF_MAX_MS,
+                            )
+                            rateLimitAttempts++
+                            logger.warn("[$accountName] Rate limit from provider for txId: $transactionId, payment: $paymentId, message: $msg. Will retry after backoff ${backoffMs}ms (in-place).")
+                            Thread.sleep(backoffMs)
                         }
                         isTemporary -> {
                             if (attempt < MAX_TEMPORARY_RETRIES) {

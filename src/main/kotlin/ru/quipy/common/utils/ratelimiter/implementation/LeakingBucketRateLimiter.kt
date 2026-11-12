@@ -45,7 +45,11 @@ class LeakingBucketRateLimiter(
     private val releaseJob = rateLimiterScope.launch {
         while (true) {
             delay(releaseIntervalMs.milliseconds)
-            semaphore.release()
+            synchronized(semaphore) {
+                if (semaphore.availablePermits() < bucketSize) {
+                    semaphore.release()
+                }
+            }
         }
     }.invokeOnCompletion { th -> if (th != null) logger.error("Rate limiter release job completed", th) }
 

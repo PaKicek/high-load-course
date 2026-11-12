@@ -1,5 +1,6 @@
 package ru.quipy.payments.logic
 
+import jakarta.annotation.PostConstruct
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -31,8 +32,8 @@ class OrderPayer {
         private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
-        private const val INGRESS_RATE_PER_SEC = 11L
-        private const val INGRESS_BUCKET_SIZE = 33
+        private const val INGRESS_BUCKET_SECONDS = 3
+        private const val INGRESS_FALLBACK_RATE_PER_SEC = 11L
         private const val MAX_TEMPORARY_ATTEMPTS = 1
     }
 
@@ -54,14 +55,42 @@ class OrderPayer {
 
     private val inFlightCount = AtomicInteger(0)
 
-    private val ingressRateLimiter: RateLimiter = LeakingBucketRateLimiter(
-        rate = INGRESS_RATE_PER_SEC,
-        window = Duration.ofSeconds(1),
-        bucketSize = INGRESS_BUCKET_SIZE,
-    )
+    @Volatile
+    private var ingressRateLimiter: RateLimiter? = null
+
+    @PostConstruct
+    fun initIngressLimiter() {
+        val throughputPerSec = paymentService.totalThroughputPerMs() * 1000.0
+        val rate = if (throughputPerSec > 0.0) {
+            throughputPerSec.toLong().coerceAtLeast(1L)
+        } else {
+            INGRESS_FALLBACK_RATE_PER_SEC
+        }
+        val bucketSize = (rate * INGRESS_BUCKET_SECONDS).toInt().coerceAtLeast(1)
+        ingressRateLimiter = LeakingBucketRateLimiter(
+            rate = rate,
+            window = Duration.ofSeconds(1),
+            bucketSize = bucketSize,
+        )
+        logger.info("Ingress rate limiter initialized: rate=$rate/s bucket=$bucketSize (throughput=${"%.2f".format(throughputPerSec)} rps)")
+    }
+
+    private fun ingressLimiter(): RateLimiter {
+        return ingressRateLimiter ?: synchronized(this) {
+            ingressRateLimiter ?: run {
+                val limiter = LeakingBucketRateLimiter(
+                    rate = INGRESS_FALLBACK_RATE_PER_SEC,
+                    window = Duration.ofSeconds(1),
+                    bucketSize = (INGRESS_FALLBACK_RATE_PER_SEC * INGRESS_BUCKET_SECONDS).toInt(),
+                )
+                ingressRateLimiter = limiter
+                limiter
+            }
+        }
+    }
 
     fun tryReserveSlot(deadline: Long): Boolean {
-        if (!ingressRateLimiter.tick()) return false
+        if (!ingressLimiter().tick()) return false
 
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return false
