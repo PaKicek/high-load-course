@@ -8,7 +8,7 @@ import java.util.UUID
  * !!! You can extend the interface with additional methods if needed. !!!
  */
 interface PaymentExternalServiceAdapter {
-    fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long)
+    fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long, attempt: Int): Boolean
     fun name(): String
     fun price(): Int
     fun isEnabled(): Boolean

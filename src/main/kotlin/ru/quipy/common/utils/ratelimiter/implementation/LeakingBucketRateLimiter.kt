@@ -22,12 +22,6 @@ class LeakingBucketRateLimiter(
     private val releaseIntervalMs = window.toMillis() / rate
     private val semaphore = Semaphore(bucketSize)
 
-    init {
-        repeat(bucketSize) {
-            semaphore.acquireUninterruptibly()
-        }
-    }
-
     override fun currentCount(): Long = (bucketSize - semaphore.availablePermits()).toLong()
 
     override fun tick(): Boolean = semaphore.tryAcquire()
@@ -45,7 +39,11 @@ class LeakingBucketRateLimiter(
     private val releaseJob = rateLimiterScope.launch {
         while (true) {
             delay(releaseIntervalMs.milliseconds)
-            semaphore.release()
+            synchronized(semaphore) {
+                if (semaphore.availablePermits() < bucketSize) {
+                    semaphore.release()
+                }
+            }
         }
     }.invokeOnCompletion { th -> if (th != null) logger.error("Rate limiter release job completed", th) }
 

@@ -36,8 +36,10 @@ class PaymentExternalServiceAdapterImpl(
 
         fun now() = System.currentTimeMillis()
 
-        private const val RATE_LIMIT_BACKOFF_MS = 200L
+        private const val RATE_LIMIT_BACKOFF_BASE_MS = 200L
+        private const val RATE_LIMIT_BACKOFF_MAX_MS = 2000L
         private const val RETRY_BACKOFF_MS = 50L
+        private const val MAX_TEMPORARY_RETRIES = 1
     }
 
     private val serviceName = properties.serviceName
@@ -80,8 +82,6 @@ class PaymentExternalServiceAdapterImpl(
         .description("Total number of successfully processed payments")
         .register(meterRegistry)
 
-
-
     private val parallelWaitCounter: Counter = Counter.builder("payment_parallel_wait_total")
         .tag("account", accountName)
         .tag("service", serviceName)
@@ -106,6 +106,12 @@ class PaymentExternalServiceAdapterImpl(
         .description("Total number of failed attempts to acquire a rate limiter permit")
         .register(meterRegistry)
 
+    private val temporaryRetryCounter: Counter = Counter.builder("payment_temporary_retry_total")
+        .tag("account", accountName)
+        .tag("service", serviceName)
+        .description("Number of temporary-error retries scheduled")
+        .register(meterRegistry)
+
     init {
         meterRegistry.gauge(
             "payment_parallel_window_queue_size",
@@ -126,10 +132,16 @@ class PaymentExternalServiceAdapterImpl(
         ) { it.currentCount().toDouble() }
     }
 
-    override fun performPaymentAsync(paymentId: UUID, amount: Int, paymentStartedAt: Long, deadline: Long) {
+    override fun performPaymentAsync(
+        paymentId: UUID,
+        amount: Int,
+        paymentStartedAt: Long,
+        deadline: Long,
+        attempt: Int,
+    ): Boolean {
         incomingPaymentsCounter.increment()
 
-        logger.warn("[$accountName] Submitting payment request for payment $paymentId")
+        logger.warn("[$accountName] Submitting payment request for payment $paymentId (attempt=$attempt)")
 
         val transactionId = UUID.randomUUID()
 
@@ -137,9 +149,10 @@ class PaymentExternalServiceAdapterImpl(
             it.logSubmission(success = true, transactionId, now(), Duration.ofMillis(now() - paymentStartedAt))
         }
 
-        logger.info("[$accountName] Submit: $paymentId , txId: $transactionId")
+        logger.info("[$accountName] Submit: $paymentId , txId: $transactionId, attempt=$attempt")
 
         var lastReason: String? = null
+        var rateLimitAttempts = 0
         val request = Request.Builder().run {
             url("http://$paymentProviderHostPort/external/process?serviceName=$serviceName&token=$token&accountName=$accountName&transactionId=$transactionId&paymentId=$paymentId&amount=$amount")
             post(emptyBody)
@@ -150,24 +163,24 @@ class PaymentExternalServiceAdapterImpl(
             val remaining = deadline - nowMs
             if (remaining <= 0) {
                 val reason = lastReason ?: "Deadline exceeded"
-                logger.warn("[$accountName] Deadline exceeded for payment $paymentId, reason=$reason")
+                logger.warn("[$accountName] Deadline exceeded for payment $paymentId (attempt=$attempt), reason=$reason")
                 paymentESService.update(paymentId) {
                     it.logProcessing(false, now(), transactionId, reason = reason)
                 }
-                return
+                return true
             }
 
             val waitBudget = Duration.ofMillis(remaining)
             parallelWaitCounter.increment()
             if (!parallelWindow.tryAcquire(waitBudget)) {
-                logger.warn("[$accountName] Parallel limit wait timeout for payment $paymentId, will retry")
+                logger.warn("[$accountName] Parallel limit wait timeout for payment $paymentId (attempt=$attempt), will retry")
                 parallelTimeoutCounter.increment()
                 Thread.sleep(RETRY_BACKOFF_MS)
                 continue
             }
             rateWaitCounter.increment()
             if (!rateLimiter.tickBlocking(waitBudget)) {
-                logger.warn("[$accountName] Rate limit wait timeout for payment $paymentId, will retry")
+                logger.warn("[$accountName] Rate limit wait timeout for payment $paymentId (attempt=$attempt), will retry")
                 rateTimeoutCounter.increment()
                 parallelWindow.release()
                 Thread.sleep(RETRY_BACKOFF_MS)
@@ -188,16 +201,45 @@ class PaymentExternalServiceAdapterImpl(
 
                     if (body.result) {
                         succeededPaymentsCounter.increment()
-                        logger.info("[$accountName] Payment processed for txId: $transactionId, payment: $paymentId, succeeded: true, message: ${body.message}")
+                        logger.info("[$accountName] Payment processed for txId: $transactionId, payment: $paymentId, succeeded: true, attempt=$attempt, message: ${body.message}")
                         paymentESService.update(paymentId) {
                             it.logProcessing(true, now(), transactionId, reason = body.message)
                         }
-                        return
-                    } else {
-                        lastReason = body.message
-                        logger.warn("[$accountName] Payment returned false for txId: $transactionId, payment: $paymentId, message: ${body.message}. Will retry if time allows.")
-                        if (body.message?.contains("Rate limit", ignoreCase = true) == true) {
-                            Thread.sleep(RATE_LIMIT_BACKOFF_MS)
+                        return true
+                    }
+
+                    lastReason = body.message
+                    val msg = body.message ?: ""
+                    val isRateLimit = msg.contains("Rate limit", ignoreCase = true)
+                    val isTemporary = msg.contains("Temporary error", ignoreCase = true)
+                    when {
+                        isRateLimit -> {
+                            val backoffMs = minOf(
+                                RATE_LIMIT_BACKOFF_BASE_MS * (1L shl rateLimitAttempts.coerceAtMost(3)),
+                                RATE_LIMIT_BACKOFF_MAX_MS,
+                            )
+                            rateLimitAttempts++
+                            logger.warn("[$accountName] Rate limit from provider for txId: $transactionId, payment: $paymentId, message: $msg. Will retry after backoff ${backoffMs}ms (in-place).")
+                            Thread.sleep(backoffMs)
+                        }
+                        isTemporary -> {
+                            if (attempt < MAX_TEMPORARY_RETRIES) {
+                                temporaryRetryCounter.increment()
+                                logger.warn("[$accountName] Temporary error from provider for txId: $transactionId, payment: $paymentId, message: $msg. Scheduling retry (attempt=${attempt + 1}).")
+                                return false
+                            }
+                            logger.warn("[$accountName] Temporary error from provider for txId: $transactionId, payment: $paymentId, message: $msg. Retries exhausted (attempt=$attempt). Final fail.")
+                            paymentESService.update(paymentId) {
+                                it.logProcessing(false, now(), transactionId, reason = msg)
+                            }
+                            return true
+                        }
+                        else -> {
+                            logger.warn("[$accountName] Payment returned false (non-retryable) for txId: $transactionId, payment: $paymentId, message: $msg")
+                            paymentESService.update(paymentId) {
+                                it.logProcessing(false, now(), transactionId, reason = msg)
+                            }
+                            return true
                         }
                     }
                 }
@@ -205,11 +247,11 @@ class PaymentExternalServiceAdapterImpl(
                 when (e) {
                     is SocketTimeoutException -> {
                         lastReason = "Request timeout"
-                        logger.error("[$accountName] Payment timeout for txId: $transactionId, payment: $paymentId", e)
+                        logger.error("[$accountName] Payment timeout for txId: $transactionId, payment: $paymentId, attempt=$attempt", e)
                     }
                     else -> {
                         lastReason = e.message ?: "Request error"
-                        logger.error("[$accountName] Payment failed for txId: $transactionId, payment: $paymentId", e)
+                        logger.error("[$accountName] Payment failed for txId: $transactionId, payment: $paymentId, attempt=$attempt", e)
                     }
                 }
             } finally {

@@ -1,5 +1,6 @@
 package ru.quipy.payments.logic
 
+import jakarta.annotation.PostConstruct
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -24,15 +25,15 @@ class OrderPayer {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(OrderPayer::class.java)
 
-        private const val IN_FLIGHT_FACTOR = 0.6
         private const val MIN_RETRY_AFTER_MS = 200L
         private const val MAX_RETRY_AFTER_MS = 1000L
         private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
         private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
-        private const val INGRESS_RATE_PER_SEC = 11L
-        private const val INGRESS_BUCKET_SIZE = 33
+        private const val INGRESS_BUCKET_SECONDS = 60
+        private const val INGRESS_FALLBACK_RATE_PER_SEC = 11L
+        private const val MAX_TEMPORARY_ATTEMPTS = 1
     }
 
     @Autowired
@@ -53,15 +54,41 @@ class OrderPayer {
 
     private val inFlightCount = AtomicInteger(0)
 
-    private val ingressRateLimiter: RateLimiter = LeakingBucketRateLimiter(
-        rate = INGRESS_RATE_PER_SEC,
-        window = Duration.ofSeconds(1),
-        bucketSize = INGRESS_BUCKET_SIZE,
-    )
+    @Volatile
+    private var ingressRateLimiter: RateLimiter? = null
+
+    @PostConstruct
+    fun initIngressLimiter() {
+        val throughputPerSec = paymentService.totalThroughputPerMs() * 1000.0
+        val rate = if (throughputPerSec > 0.0) {
+            throughputPerSec.toLong().coerceAtLeast(1L)
+        } else {
+            INGRESS_FALLBACK_RATE_PER_SEC
+        }
+        val bucketSize = (rate * INGRESS_BUCKET_SECONDS).toInt().coerceAtLeast(1)
+        ingressRateLimiter = LeakingBucketRateLimiter(
+            rate = rate,
+            window = Duration.ofSeconds(1),
+            bucketSize = bucketSize,
+        )
+        logger.info("Ingress rate limiter initialized: rate=$rate/s bucket=$bucketSize (throughput=${"%.2f".format(throughputPerSec)} rps)")
+    }
+
+    private fun ingressLimiter(): RateLimiter {
+        return ingressRateLimiter ?: synchronized(this) {
+            ingressRateLimiter ?: run {
+                val limiter = LeakingBucketRateLimiter(
+                    rate = INGRESS_FALLBACK_RATE_PER_SEC,
+                    window = Duration.ofSeconds(1),
+                    bucketSize = (INGRESS_FALLBACK_RATE_PER_SEC * INGRESS_BUCKET_SECONDS).toInt(),
+                )
+                ingressRateLimiter = limiter
+                limiter
+            }
+        }
+    }
 
     fun tryReserveSlot(deadline: Long): Boolean {
-        if (!ingressRateLimiter.tick()) return false
-
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return false
         val throughputPerMs = paymentService.totalThroughputPerMs()
@@ -69,17 +96,22 @@ class OrderPayer {
         val avgProcessingMs = paymentService.averageProcessingTimeMs()
         if (avgProcessingMs <= 0) return false
 
-        val accountCapacity = (throughputPerMs * remainingMs).toLong()
-        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * remainingMs / avgProcessingMs
-
-        val capacity = (minOf(accountCapacity, executorCapacity) * IN_FLIGHT_FACTOR).toLong()
+        val capacity = queueCapacity(throughputPerMs, avgProcessingMs, remainingMs)
         if (capacity <= 0) return false
 
-        while (true) {
-            val current = inFlightCount.get()
-            if (current >= capacity) return false
-            if (inFlightCount.compareAndSet(current, current + 1)) return true
+        synchronized(inFlightCount) {
+            if (inFlightCount.get() >= capacity) return false
+            if (!ingressLimiter().tick()) return false
+            inFlightCount.incrementAndGet()
+            return true
         }
+    }
+
+    private fun queueCapacity(throughputPerMs: Double, avgProcessingMs: Long, remainingMs: Long): Long {
+        val waitBudgetMs = (remainingMs - avgProcessingMs).coerceAtLeast(0L)
+        val accountCapacity = (throughputPerMs * waitBudgetMs).toLong()
+        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * waitBudgetMs / avgProcessingMs
+        return minOf(accountCapacity, executorCapacity)
     }
 
     fun retryAfterMs(deadline: Long): Long {
@@ -90,10 +122,7 @@ class OrderPayer {
         val avgProcessingMs = paymentService.averageProcessingTimeMs()
         if (avgProcessingMs <= 0) return MIN_RETRY_AFTER_MS
 
-        val accountCapacity = (throughputPerMs * remainingMs).toLong()
-        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * remainingMs / avgProcessingMs
-
-        val capacity = (minOf(accountCapacity, executorCapacity) * IN_FLIGHT_FACTOR).toLong()
+        val capacity = queueCapacity(throughputPerMs, avgProcessingMs, remainingMs)
         val excess = (inFlightCount.get() - capacity).coerceAtLeast(1L)
         val waitMs = (excess / throughputPerMs).toLong()
 
@@ -105,20 +134,79 @@ class OrderPayer {
         val createdAt = System.currentTimeMillis()
         try {
             paymentExecutor.submit {
-                try {
-                    val createdEvent = paymentESService.create {
-                        it.create(paymentId, orderId, amount)
-                    }
-                    logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
-                    paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline)
-                } finally {
-                    inFlightCount.decrementAndGet()
-                }
+                runPaymentAttempt(paymentId, orderId, amount, createdAt, deadline, attempt = 0)
             }
         } catch (e: Exception) {
             inFlightCount.decrementAndGet()
             throw e
         }
         return createdAt
+    }
+
+    private fun runPaymentAttempt(
+        paymentId: UUID,
+        orderId: UUID,
+        amount: Int,
+        createdAt: Long,
+        deadline: Long,
+        attempt: Int,
+    ) {
+        try {
+            if (attempt == 0) {
+                val createdEvent = paymentESService.create {
+                    it.create(paymentId, orderId, amount)
+                }
+                logger.trace("Payment {} for order {} created.", createdEvent.paymentId, orderId)
+            }
+
+            if (System.currentTimeMillis() >= deadline) {
+                logger.warn("Payment {} deadline exceeded before attempt={}", paymentId, attempt)
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Deadline exceeded")
+                }
+                releaseSlot()
+                return
+            }
+
+            val completed = paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline, attempt)
+            if (completed) {
+                releaseSlot()
+                return
+            }
+
+            if (attempt >= MAX_TEMPORARY_ATTEMPTS) {
+                logger.warn("Payment {} temporary retries exhausted (attempt={})", paymentId, attempt)
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Temporary error retries exhausted")
+                }
+                releaseSlot()
+                return
+            }
+
+            logger.info("Payment {} scheduling retry (attempt={} -> {})", paymentId, attempt, attempt + 1)
+            try {
+                paymentExecutor.submit {
+                    runPaymentAttempt(paymentId, orderId, amount, createdAt, deadline, attempt + 1)
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to schedule retry for payment $paymentId", e)
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Retry scheduling failed: ${e.message}")
+                }
+                releaseSlot()
+            }
+        } catch (e: Exception) {
+            logger.error("Payment {} attempt={} failed with exception", paymentId, attempt, e)
+            runCatching {
+                paymentESService.update(paymentId) {
+                    it.logProcessing(false, System.currentTimeMillis(), null, reason = e.message ?: "Unknown error")
+                }
+            }
+            releaseSlot()
+        }
+    }
+
+    private fun releaseSlot() {
+        inFlightCount.decrementAndGet()
     }
 }

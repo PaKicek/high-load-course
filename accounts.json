@@ -1,0 +1,34 @@
+{
+  "Base tests": {
+    "acc-3": {
+      "parallelRequests": 30,
+      "rateLimitPerSec": 10,
+      "price": 30,
+      "averageProcessingTime": "PT1S"
+    },
+    "acc-5": {
+      "parallelRequests": 5,
+      "rateLimitPerSec": 3,
+      "price": 30,
+      "averageProcessingTime": "PT4.9S"
+    },
+    "acc-18": {
+      "parallelRequests": 10000,
+      "rateLimitPerSec": 110,
+      "price": 30,
+      "averageProcessingTime": "PT1S"
+    },
+    "acc-23": {
+      "parallelRequests": 64,
+      "rateLimitPerSec": 11,
+      "price": 30,
+      "averageProcessingTime": "PT1S"
+    },
+    "acc-8": {
+      "parallelRequests": 50,
+      "rateLimitPerSec": 10,
+      "price": 30,
+      "averageProcessingTime": "PT0.7S"
+    }
+  }
+}
