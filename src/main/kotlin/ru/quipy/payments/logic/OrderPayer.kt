@@ -25,14 +25,13 @@ class OrderPayer {
     companion object {
         val logger: Logger = LoggerFactory.getLogger(OrderPayer::class.java)
 
-        private const val IN_FLIGHT_FACTOR = 0.6
         private const val MIN_RETRY_AFTER_MS = 200L
         private const val MAX_RETRY_AFTER_MS = 1000L
         private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
         private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
-        private const val INGRESS_BUCKET_SECONDS = 3
+        private const val INGRESS_BUCKET_SECONDS = 60
         private const val INGRESS_FALLBACK_RATE_PER_SEC = 11L
         private const val MAX_TEMPORARY_ATTEMPTS = 1
     }
@@ -90,8 +89,6 @@ class OrderPayer {
     }
 
     fun tryReserveSlot(deadline: Long): Boolean {
-        if (!ingressLimiter().tick()) return false
-
         val remainingMs = deadline - System.currentTimeMillis()
         if (remainingMs <= 0) return false
         val throughputPerMs = paymentService.totalThroughputPerMs()
@@ -99,17 +96,22 @@ class OrderPayer {
         val avgProcessingMs = paymentService.averageProcessingTimeMs()
         if (avgProcessingMs <= 0) return false
 
-        val accountCapacity = (throughputPerMs * remainingMs).toLong()
-        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * remainingMs / avgProcessingMs
-
-        val capacity = (minOf(accountCapacity, executorCapacity) * IN_FLIGHT_FACTOR).toLong()
+        val capacity = queueCapacity(throughputPerMs, avgProcessingMs, remainingMs)
         if (capacity <= 0) return false
 
-        while (true) {
-            val current = inFlightCount.get()
-            if (current >= capacity) return false
-            if (inFlightCount.compareAndSet(current, current + 1)) return true
+        synchronized(inFlightCount) {
+            if (inFlightCount.get() >= capacity) return false
+            if (!ingressLimiter().tick()) return false
+            inFlightCount.incrementAndGet()
+            return true
         }
+    }
+
+    private fun queueCapacity(throughputPerMs: Double, avgProcessingMs: Long, remainingMs: Long): Long {
+        val waitBudgetMs = (remainingMs - avgProcessingMs).coerceAtLeast(0L)
+        val accountCapacity = (throughputPerMs * waitBudgetMs).toLong()
+        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * waitBudgetMs / avgProcessingMs
+        return minOf(accountCapacity, executorCapacity)
     }
 
     fun retryAfterMs(deadline: Long): Long {
@@ -120,10 +122,7 @@ class OrderPayer {
         val avgProcessingMs = paymentService.averageProcessingTimeMs()
         if (avgProcessingMs <= 0) return MIN_RETRY_AFTER_MS
 
-        val accountCapacity = (throughputPerMs * remainingMs).toLong()
-        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * remainingMs / avgProcessingMs
-
-        val capacity = (minOf(accountCapacity, executorCapacity) * IN_FLIGHT_FACTOR).toLong()
+        val capacity = queueCapacity(throughputPerMs, avgProcessingMs, remainingMs)
         val excess = (inFlightCount.get() - capacity).coerceAtLeast(1L)
         val waitMs = (excess / throughputPerMs).toLong()
 

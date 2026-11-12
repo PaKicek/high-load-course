@@ -22,12 +22,6 @@ class LeakingBucketRateLimiter(
     private val releaseIntervalMs = window.toMillis() / rate
     private val semaphore = Semaphore(bucketSize)
 
-    init {
-        repeat(bucketSize) {
-            semaphore.acquireUninterruptibly()
-        }
-    }
-
     override fun currentCount(): Long = (bucketSize - semaphore.availablePermits()).toLong()
 
     override fun tick(): Boolean = semaphore.tryAcquire()
