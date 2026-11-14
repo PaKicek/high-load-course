@@ -31,9 +31,10 @@ class OrderPayer {
         private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
-        private const val INGRESS_BUCKET_SECONDS = 60
+        private const val INGRESS_BUCKET_SECONDS = 5
         private const val INGRESS_FALLBACK_RATE_PER_SEC = 11L
         private const val MAX_TEMPORARY_ATTEMPTS = 1
+        private const val CAPACITY_SAFETY_FACTOR = 0.85
     }
 
     @Autowired
@@ -109,7 +110,7 @@ class OrderPayer {
 
     private fun queueCapacity(throughputPerMs: Double, avgProcessingMs: Long, remainingMs: Long): Long {
         val waitBudgetMs = (remainingMs - avgProcessingMs).coerceAtLeast(0L)
-        val accountCapacity = (throughputPerMs * waitBudgetMs).toLong()
+        val accountCapacity = (throughputPerMs * waitBudgetMs * CAPACITY_SAFETY_FACTOR).toLong()
         val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * waitBudgetMs / avgProcessingMs
         return minOf(accountCapacity, executorCapacity)
     }
