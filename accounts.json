@@ -1,5 +1,5 @@
 {
-  "Base tests": {
+  "Base accounts": {
     "acc-3": {
       "parallelRequests": 30,
       "rateLimitPerSec": 10,
