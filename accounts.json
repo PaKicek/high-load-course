@@ -4,31 +4,152 @@
       "parallelRequests": 30,
       "rateLimitPerSec": 10,
       "price": 30,
-      "averageProcessingTime": "PT1S"
+      "averageProcessingTime": "PT1S",
+      "tests": "hw-01"
     },
     "acc-5": {
       "parallelRequests": 5,
       "rateLimitPerSec": 3,
       "price": 30,
-      "averageProcessingTime": "PT4.9S"
+      "averageProcessingTime": "PT4.9S",
+      "tests": "hw-02,hw-03"
     },
     "acc-18": {
       "parallelRequests": 10000,
       "rateLimitPerSec": 110,
       "price": 30,
-      "averageProcessingTime": "PT1S"
+      "averageProcessingTime": "PT1S",
+      "tests": "hw-04"
     },
     "acc-23": {
       "parallelRequests": 64,
       "rateLimitPerSec": 11,
       "price": 30,
-      "averageProcessingTime": "PT1S"
+      "averageProcessingTime": "PT1S",
+      "tests": "hw-05"
     },
     "acc-8": {
       "parallelRequests": 50,
       "rateLimitPerSec": 10,
       "price": 30,
-      "averageProcessingTime": "PT0.7S"
+      "averageProcessingTime": "PT0.7S",
+      "tests": "hw-06"
+    },
+    "acc-7": {
+      "parallelRequests": 50,
+      "rateLimitPerSec": 8,
+      "price": 30,
+      "averageProcessingTime": "PT1.2S",
+      "tests": "hw-07"
+    },
+    "acc-9": {
+      "parallelRequests": 50,
+      "rateLimitPerSec": 120,
+      "price": 30,
+      "averageProcessingTime": "PT0.5S",
+      "tests": "hw-08"
+    },
+    "acc-12": {
+      "parallelRequests": 20000,
+      "rateLimitPerSec": 1100,
+      "price": 30,
+      "averageProcessingTime": "PT10S",
+      "tests": "hw-09"
+    },
+    "acc-13": {
+      "parallelRequests": 2000,
+      "rateLimitPerSec": 5000,
+      "price": 30,
+      "averageProcessingTime": "PT0.01S",
+      "tests": "hw-10"
+    },
+    "acc-22": {
+      "parallelRequests": 20000,
+      "rateLimitPerSec": 1100,
+      "price": 5,
+      "averageProcessingTime": "PT1.6S",
+      "tests": "hw-11"
+    },
+    "acc-19": {
+      "parallelRequests": 20000,
+      "rateLimitPerSec": 200,
+      "price": 25,
+      "averageProcessingTime": "PT0.1S",
+      "tests": "hw-12"
+    }
+  },
+  "Other accounts": {
+    "acc-1": {
+      "parallelRequests": 1000,
+      "rateLimitPerSec": 15,
+      "price": 100,
+      "averageProcessingTime": "PT1S"
+    },
+    "default-2": {
+      "parallelRequests": 100,
+      "rateLimitPerSec": 10,
+      "price": 15,
+      "averageProcessingTime": "PT5S"
+    },
+    "default-4": {
+      "parallelRequests": 15,
+      "rateLimitPerSec": 5,
+      "price": 30,
+      "averageProcessingTime": "PT4.5S"
+    },
+    "default-6": {
+      "parallelRequests": 35,
+      "rateLimitPerSec": 30,
+      "price": 30,
+      "averageProcessingTime": "PT0.5S"
+    },
+    "acc-10": {
+      "parallelRequests": 200,
+      "rateLimitPerSec": 480,
+      "price": 30,
+      "averageProcessingTime": "PT0.5S"
+    },
+    "acc-11": {
+      "parallelRequests": 400,
+      "rateLimitPerSec": 480,
+      "price": 30,
+      "averageProcessingTime": "PT1S"
+    },
+    "acc-14": {
+      "parallelRequests": 1500,
+      "rateLimitPerSec": 500,
+      "price": 45,
+      "averageProcessingTime": "PT0.5S"
+    },
+    "acc-15": {
+      "parallelRequests": 1500,
+      "rateLimitPerSec": 200,
+      "price": 30,
+      "averageProcessingTime": "PT1S"
+    },
+    "acc-16": {
+      "parallelRequests": 10,
+      "rateLimitPerSec": 30,
+      "price": 30,
+      "averageProcessingTime": "PT0.8S"
+    },
+    "acc-17": {
+      "parallelRequests": 40,
+      "rateLimitPerSec": 30,
+      "price": 30,
+      "averageProcessingTime": "PT0.95S"
+    },
+    "acc-20": {
+      "parallelRequests": 100,
+      "rateLimitPerSec": 100,
+      "price": 35,
+      "averageProcessingTime": "PT1S"
+    },
+    "acc-21": {
+      "parallelRequests": 600,
+      "rateLimitPerSec": 30,
+      "price": 20,
+      "averageProcessingTime": "PT10S"
     }
   }
 }
