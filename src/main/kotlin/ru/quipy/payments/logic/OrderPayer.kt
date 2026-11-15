@@ -34,7 +34,7 @@ class OrderPayer {
         private const val INGRESS_BUCKET_SECONDS = 60
         private const val INGRESS_FALLBACK_RATE_PER_SEC = 11L
         private const val MAX_TEMPORARY_ATTEMPTS = 1
-        private const val CAPACITY_SAFETY_FACTOR = 0.6
+        private const val CAPACITY_SAFETY_FACTOR = 1
     }
 
     @Autowired
