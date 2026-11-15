@@ -31,10 +31,10 @@ class OrderPayer {
         private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
-        private const val INGRESS_BUCKET_SECONDS = 5
+        private const val INGRESS_BUCKET_SECONDS = 60
         private const val INGRESS_FALLBACK_RATE_PER_SEC = 11L
         private const val MAX_TEMPORARY_ATTEMPTS = 1
-        private const val CAPACITY_SAFETY_FACTOR = 0.85
+        private const val CAPACITY_SAFETY_FACTOR = 0.6
     }
 
     @Autowired
