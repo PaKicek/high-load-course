@@ -19,12 +19,12 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
-    "hw-04-1": { // from 2025/2026 year
+    "hw-04-old-1": {
       "ratePerSecond": 200,
       "testCount": 1500,
       "processingTimeMillis": 3000
     },
-    "hw-04-2": { // from 2025/2026 year
+    "hw-04-old-2": {
       "ratePerSecond": 16,
       "testCount": 1600,
       "processingTimeMillis": 30000
@@ -55,6 +55,11 @@
       "ratePerSecond": 5,
       "testCount": 1000,
       "processingTimeMillis": 6000
+    },
+    "hw-07-bonus": {
+      "ratePerSecond": 5,
+      "testCount": 800,
+      "processingTimeMillis": 5000
     },
     "hw-08": {
       "ratePerSecond": 100,
@@ -123,14 +128,14 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
-    "hw-04-1": { // from 2025/2026 year
+    "hw-04-old-1": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
       "ratePerSecond": 200,
       "testCount": 1500,
       "processingTimeMillis": 3000
     },
-    "hw-04-2": { // from 2025/2026 year
+    "hw-04-old-2": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
       "ratePerSecond": 16,
@@ -173,6 +178,13 @@
       "ratePerSecond": 5,
       "testCount": 1000,
       "processingTimeMillis": 6000
+    },
+    "hw-07-bonus": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "ratePerSecond": 5,
+      "testCount": 800,
+      "processingTimeMillis": 5000
     },
     "hw-08": {
       "serviceName": "{{serviceName}}",
@@ -264,7 +276,7 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
-    "hw-04-1": { // from 2025/2026 year
+    "hw-04-old-1": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
       "branch": "hw-04",
@@ -273,7 +285,7 @@
       "testCount": 1500,
       "processingTimeMillis": 3000
     },
-    "hw-04-2": { // from 2025/2026 year
+    "hw-04-old-2": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
       "branch": "hw-04",
@@ -328,6 +340,15 @@
       "ratePerSecond": 5,
       "testCount": 1000,
       "processingTimeMillis": 6000
+    },
+    "hw-07-bonus": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "branch": "hw-07",
+      "accounts": "acc-16",
+      "ratePerSecond": 5,
+      "testCount": 800,
+      "processingTimeMillis": 5000
     },
     "hw-08": {
       "serviceName": "{{serviceName}}",

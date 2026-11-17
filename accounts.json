@@ -42,6 +42,13 @@
       "averageProcessingTime": "PT1.2S",
       "tests": "hw-07"
     },
+    "acc-16": {
+      "parallelRequests": 10,
+      "rateLimitPerSec": 30,
+      "price": 30,
+      "averageProcessingTime": "PT0.8S",
+      "tests": "hw-07"
+    },
     "acc-9": {
       "parallelRequests": 50,
       "rateLimitPerSec": 120,
@@ -126,12 +133,6 @@
       "rateLimitPerSec": 200,
       "price": 30,
       "averageProcessingTime": "PT1S"
-    },
-    "acc-16": {
-      "parallelRequests": 10,
-      "rateLimitPerSec": 30,
-      "price": 30,
-      "averageProcessingTime": "PT0.8S"
     },
     "acc-17": {
       "parallelRequests": 40,
