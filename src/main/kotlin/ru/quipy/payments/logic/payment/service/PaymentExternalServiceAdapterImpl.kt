@@ -5,6 +5,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
+import io.micrometer.core.instrument.Timer
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -44,7 +45,7 @@ class PaymentExternalServiceAdapterImpl(
         private const val RATE_LIMIT_BACKOFF_MAX_MS = 2000L
         private const val RETRY_BACKOFF_MS = 50L
         private const val MAX_TEMPORARY_RETRIES = 1
-        private const val CALL_TIMEOUT_FACTOR = 4.0
+        private const val CALL_TIMEOUT_FACTOR = 2.0
     }
 
     private val serviceName = properties.serviceName
@@ -127,6 +128,13 @@ class PaymentExternalServiceAdapterImpl(
         .description("Number of provider-call timeout retries (408 / read timeout)")
         .register(meterRegistry)
 
+    private val providerCallTimer: Timer = Timer.builder("payment_provider_call_duration")
+        .tag("account", accountName)
+        .tag("service", serviceName)
+        .description("Duration of a single outgoing HTTP call to the payment provider")
+        .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+        .register(meterRegistry)
+
     init {
         meterRegistry.gauge(
             "payment_parallel_window_queue_size",
@@ -203,6 +211,7 @@ class PaymentExternalServiceAdapterImpl(
                 continue
             }
 
+            val callStartNanos = System.nanoTime()
             try {
                 outgoingRequestsCounter.increment()
                 client.newCall(request).execute().use { response ->
@@ -278,6 +287,7 @@ class PaymentExternalServiceAdapterImpl(
                     }
                 }
             } finally {
+                providerCallTimer.record(System.nanoTime() - callStartNanos, TimeUnit.NANOSECONDS)
                 parallelWindow.release()
             }
         }
