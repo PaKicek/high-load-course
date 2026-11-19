@@ -5,8 +5,8 @@
     "name": "KVr-Vmpnz",
     "namespace": "default",
     "uid": "c03bb97b-089d-4dca-8815-723d277c185b",
-    "resourceVersion": "1794957778826008",
-    "generation": 5,
+    "resourceVersion": "1794957868817997",
+    "generation": 6,
     "creationTimestamp": "2026-11-05T02:25:09Z",
     "labels": {
       "grafana.app/deprecatedInternalID": "1475883434201088"
@@ -15,11 +15,11 @@
       "grafana.app/createdBy": "access-policy:service",
       "grafana.app/managedBy": "classic-file-provisioning",
       "grafana.app/managerId": "Default",
-      "grafana.app/sourceChecksum": "b705ea8e519590f99eaa348730a3ef01",
+      "grafana.app/sourceChecksum": "28c284026f3ad8cdc01a3702a63dd8b6",
       "grafana.app/sourcePath": "/etc/grafana/provisioning/dashboards/ServicesStatistic.json",
-      "grafana.app/sourceTimestamp": "1794957775000",
+      "grafana.app/sourceTimestamp": "1794957862000",
       "grafana.app/updatedBy": "access-policy:service",
-      "grafana.app/updatedTimestamp": "2026-11-17T23:22:58Z"
+      "grafana.app/updatedTimestamp": "2026-11-17T23:23:58Z"
     }
   },
   "spec": {
@@ -1742,7 +1742,7 @@
                       }
                     ]
                   },
-                  "unit": "ms"
+                  "unit": "s"
                 },
                 "overrides": [
                   {
