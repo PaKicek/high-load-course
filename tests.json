@@ -19,6 +19,16 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
+    "hw-04-old-1": {
+      "ratePerSecond": 200,
+      "testCount": 1500,
+      "processingTimeMillis": 3000
+    },
+    "hw-04-old-2": {
+      "ratePerSecond": 16,
+      "testCount": 1600,
+      "processingTimeMillis": 30000
+    },
     "hw-05-1": {
       "ratePerSecond": 15,
       "testCount": 3000,
@@ -42,22 +52,39 @@
       "processingTimeMillis": 3500
     },
     "hw-07": {
-
+      "ratePerSecond": 5,
+      "testCount": 1000,
+      "processingTimeMillis": 6000
+    },
+    "hw-07-bonus": {
+      "ratePerSecond": 5,
+      "testCount": 800,
+      "processingTimeMillis": 5000
     },
     "hw-08": {
-
+      "ratePerSecond": 100,
+      "testCount": 5000,
+      "processingTimeMillis": 20000
     },
     "hw-09": {
-
+      "ratePerSecond": 1000,
+      "testCount": 200000,
+      "processingTimeMillis": 50000
     },
     "hw-10": {
-
+      "ratePerSecond": 4000,
+      "testCount": 1500000,
+      "processingTimeMillis": 1000
     },
     "hw-11": {
-
+      "ratePerSecond": 100,
+      "testCount": 20000,
+      "processingTimeMillis": 1500
     },
     "hw-12": {
-
+      "ratePerSecond": 100,
+      "testCount": 50000,
+      "processingTimeMillis": 10000000
     },
     "hw-13": {
 
@@ -101,6 +128,20 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
+    "hw-04-old-1": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "ratePerSecond": 200,
+      "testCount": 1500,
+      "processingTimeMillis": 3000
+    },
+    "hw-04-old-2": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "ratePerSecond": 16,
+      "testCount": 1600,
+      "processingTimeMillis": 30000
+    },
     "hw-05-1": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
@@ -133,27 +174,52 @@
     },
     "hw-07": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 5,
+      "testCount": 1000,
+      "processingTimeMillis": 6000
+    },
+    "hw-07-bonus": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "ratePerSecond": 5,
+      "testCount": 800,
+      "processingTimeMillis": 5000
     },
     "hw-08": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 100,
+      "testCount": 5000,
+      "processingTimeMillis": 20000
     },
     "hw-09": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 1000,
+      "testCount": 200000,
+      "processingTimeMillis": 50000
     },
     "hw-10": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 4000,
+      "testCount": 1500000,
+      "processingTimeMillis": 1000
     },
     "hw-11": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 100,
+      "testCount": 20000,
+      "processingTimeMillis": 1500
     },
     "hw-12": {
       "serviceName": "{{serviceName}}",
-      "token": "{{token}}"
+      "token": "{{token}}",
+      "ratePerSecond": 100,
+      "testCount": 50000,
+      "processingTimeMillis": 10000000
     },
     "hw-13": {
       "serviceName": "{{serviceName}}",
@@ -210,6 +276,24 @@
       "testCount": 6000,
       "processingTimeMillis": 3000
     },
+    "hw-04-old-1": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "branch": "hw-04",
+      "accounts": "acc-18",
+      "ratePerSecond": 200,
+      "testCount": 1500,
+      "processingTimeMillis": 3000
+    },
+    "hw-04-old-2": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "branch": "hw-04",
+      "accounts": "acc-23",
+      "ratePerSecond": 16,
+      "testCount": 1600,
+      "processingTimeMillis": 30000
+    },
     "hw-05-1": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
@@ -251,32 +335,65 @@
     "hw-07": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-07"
+      "branch": "hw-07",
+      "accounts": "acc-7",
+      "ratePerSecond": 5,
+      "testCount": 1000,
+      "processingTimeMillis": 6000
+    },
+    "hw-07-bonus": {
+      "serviceName": "{{serviceName}}",
+      "token": "{{token}}",
+      "branch": "hw-07",
+      "accounts": "acc-16",
+      "ratePerSecond": 5,
+      "testCount": 800,
+      "processingTimeMillis": 5000
     },
     "hw-08": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-08"
+      "branch": "hw-08",
+      "accounts": "acc-9",
+      "ratePerSecond": 100,
+      "testCount": 5000,
+      "processingTimeMillis": 20000
     },
     "hw-09": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-09"
+      "branch": "hw-09",
+      "accounts": "acc-12",
+      "ratePerSecond": 1000,
+      "testCount": 200000,
+      "processingTimeMillis": 50000
     },
     "hw-10": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-10"
+      "branch": "hw-10",
+      "accounts": "acc-13",
+      "ratePerSecond": 4000,
+      "testCount": 1500000,
+      "processingTimeMillis": 1000
     },
     "hw-11": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-11"
+      "branch": "hw-11",
+      "accounts": "acc-22",
+      "ratePerSecond": 100,
+      "testCount": 20000,
+      "processingTimeMillis": 1500
     },
     "hw-12": {
       "serviceName": "{{serviceName}}",
       "token": "{{token}}",
-      "branch": "hw-12"
+      "branch": "hw-12",
+      "accounts": "acc-19",
+      "ratePerSecond": 100,
+      "testCount": 50000,
+      "processingTimeMillis": 10000000
     },
     "hw-13": {
       "serviceName": "{{serviceName}}",
