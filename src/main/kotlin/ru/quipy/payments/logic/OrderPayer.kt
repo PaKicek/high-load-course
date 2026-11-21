@@ -27,8 +27,8 @@ class OrderPayer {
 
         private const val MIN_RETRY_AFTER_MS = 200L
         private const val MAX_RETRY_AFTER_MS = 1000L
-        private const val PAYMENT_CORE_EXECUTOR_THREADS = 256
-        private const val PAYMENT_MAX_EXECUTOR_THREADS = 512
+        private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
+        private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
         private const val INGRESS_BUCKET_SECONDS = 60
