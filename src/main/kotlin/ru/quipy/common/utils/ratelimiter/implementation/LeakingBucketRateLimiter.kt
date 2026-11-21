@@ -37,11 +37,20 @@ class LeakingBucketRateLimiter(
         }
 
     private val releaseJob = rateLimiterScope.launch {
+        var lastReleaseNanos = System.nanoTime()
         while (true) {
             delay(releaseIntervalMs.milliseconds)
-            synchronized(semaphore) {
-                if (semaphore.availablePermits() < bucketSize) {
-                    semaphore.release()
+            val nowNanos = System.nanoTime()
+            val elapsedNanos = nowNanos - lastReleaseNanos
+            val permitsToRelease = (elapsedNanos / (releaseIntervalMs * 1_000_000L)).toInt()
+            if (permitsToRelease > 0) {
+                lastReleaseNanos += permitsToRelease * releaseIntervalMs * 1_000_000L
+                synchronized(semaphore) {
+                    val available = semaphore.availablePermits()
+                    val toRelease = minOf(permitsToRelease, bucketSize - available)
+                    if (toRelease > 0) {
+                        semaphore.release(toRelease)
+                    }
                 }
             }
         }
