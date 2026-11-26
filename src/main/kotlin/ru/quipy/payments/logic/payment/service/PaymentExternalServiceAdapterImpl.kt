@@ -69,7 +69,7 @@ class PaymentExternalServiceAdapterImpl(
         .connectTimeout(Duration.ofSeconds(5))
         .readTimeout(callTimeout)
         .writeTimeout(Duration.ofSeconds(10))
-        .connectionPool(ConnectionPool(500, 5, TimeUnit.MINUTES))
+        .connectionPool(ConnectionPool(50, 5, TimeUnit.MINUTES))
         .build()
 
     private val accountTag = Tag.of("account", accountName)

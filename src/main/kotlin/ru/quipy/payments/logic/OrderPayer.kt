@@ -14,7 +14,7 @@ import ru.quipy.payments.api.PaymentAggregate
 import ru.quipy.payments.logic.payment.service.PaymentService
 import java.time.Duration
 import java.util.*
-import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -27,8 +27,8 @@ class OrderPayer {
 
         private const val MIN_RETRY_AFTER_MS = 200L
         private const val MAX_RETRY_AFTER_MS = 1000L
-        private const val PAYMENT_CORE_EXECUTOR_THREADS = 256
-        private const val PAYMENT_MAX_EXECUTOR_THREADS = 2048
+        private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
+        private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
         private const val INGRESS_BUCKET_SECONDS = 60
@@ -47,8 +47,8 @@ class OrderPayer {
         PAYMENT_CORE_EXECUTOR_THREADS,
         PAYMENT_MAX_EXECUTOR_THREADS,
         PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS,
-        TimeUnit.SECONDS,
-        SynchronousQueue(),
+        TimeUnit.MILLISECONDS,
+        LinkedBlockingQueue(8_000),
         NamedThreadFactory("payment-submission-executor"),
         CallerBlockingRejectedExecutionHandler()
     )
@@ -110,7 +110,9 @@ class OrderPayer {
 
     private fun queueCapacity(throughputPerMs: Double, avgProcessingMs: Long, remainingMs: Long): Long {
         val waitBudgetMs = (remainingMs - avgProcessingMs).coerceAtLeast(0L)
-        return (throughputPerMs * waitBudgetMs * CAPACITY_SAFETY_FACTOR).toLong()
+        val accountCapacity = (throughputPerMs * waitBudgetMs * CAPACITY_SAFETY_FACTOR).toLong()
+        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * waitBudgetMs / avgProcessingMs
+        return minOf(accountCapacity, executorCapacity)
     }
 
     fun retryAfterMs(deadline: Long): Long {
