@@ -14,7 +14,7 @@ import ru.quipy.payments.api.PaymentAggregate
 import ru.quipy.payments.logic.payment.service.PaymentService
 import java.time.Duration
 import java.util.*
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -27,8 +27,8 @@ class OrderPayer {
 
         private const val MIN_RETRY_AFTER_MS = 200L
         private const val MAX_RETRY_AFTER_MS = 1000L
-        private const val PAYMENT_CORE_EXECUTOR_THREADS = 128
-        private const val PAYMENT_MAX_EXECUTOR_THREADS = 256
+        private const val PAYMENT_CORE_EXECUTOR_THREADS = 256
+        private const val PAYMENT_MAX_EXECUTOR_THREADS = 2048
         private const val PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS = 60L
 
         private const val INGRESS_BUCKET_SECONDS = 60
@@ -47,8 +47,8 @@ class OrderPayer {
         PAYMENT_CORE_EXECUTOR_THREADS,
         PAYMENT_MAX_EXECUTOR_THREADS,
         PAYMENT_EXECUTOR_KEEP_ALIVE_SECONDS,
-        TimeUnit.MILLISECONDS,
-        LinkedBlockingQueue(8_000),
+        TimeUnit.SECONDS,
+        SynchronousQueue(),
         NamedThreadFactory("payment-submission-executor"),
         CallerBlockingRejectedExecutionHandler()
     )
@@ -110,9 +110,7 @@ class OrderPayer {
 
     private fun queueCapacity(throughputPerMs: Double, avgProcessingMs: Long, remainingMs: Long): Long {
         val waitBudgetMs = (remainingMs - avgProcessingMs).coerceAtLeast(0L)
-        val accountCapacity = (throughputPerMs * waitBudgetMs * CAPACITY_SAFETY_FACTOR).toLong()
-        val executorCapacity = PAYMENT_CORE_EXECUTOR_THREADS * waitBudgetMs / avgProcessingMs
-        return minOf(accountCapacity, executorCapacity)
+        return (throughputPerMs * waitBudgetMs * CAPACITY_SAFETY_FACTOR).toLong()
     }
 
     fun retryAfterMs(deadline: Long): Long {
@@ -169,33 +167,40 @@ class OrderPayer {
                 return
             }
 
-            val completed = paymentService.submitPaymentRequest(paymentId, amount, createdAt, deadline, attempt)
-            if (completed) {
-                releaseSlot()
-                return
-            }
+            paymentService.submitPaymentRequestFuture(paymentId, amount, createdAt, deadline, attempt)
+                .whenComplete { completed, ex ->
+                    if (ex != null) {
+                        logger.error("Payment $paymentId failed with exception on attempt=$attempt", ex)
+                        releaseSlot()
+                        return@whenComplete
+                    }
+                    if (completed == true) {
+                        releaseSlot()
+                        return@whenComplete
+                    }
 
-            if (attempt >= MAX_TEMPORARY_ATTEMPTS) {
-                logger.warn("Payment {} temporary retries exhausted (attempt={})", paymentId, attempt)
-                paymentESService.update(paymentId) {
-                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Temporary error retries exhausted")
-                }
-                releaseSlot()
-                return
-            }
+                    if (attempt >= MAX_TEMPORARY_ATTEMPTS) {
+                        logger.warn("Payment {} temporary retries exhausted (attempt={})", paymentId, attempt)
+                        paymentESService.update(paymentId) {
+                            it.logProcessing(false, System.currentTimeMillis(), null, reason = "Temporary error retries exhausted")
+                        }
+                        releaseSlot()
+                        return@whenComplete
+                    }
 
-            logger.info("Payment {} scheduling retry (attempt={} -> {})", paymentId, attempt, attempt + 1)
-            try {
-                paymentExecutor.submit {
-                    runPaymentAttempt(paymentId, orderId, amount, createdAt, deadline, attempt + 1)
+                    logger.info("Payment {} scheduling retry (attempt={} -> {})", paymentId, attempt, attempt + 1)
+                    try {
+                        paymentExecutor.submit {
+                            runPaymentAttempt(paymentId, orderId, amount, createdAt, deadline, attempt + 1)
+                        }
+                    } catch (e: Exception) {
+                        logger.error("Failed to schedule retry for payment $paymentId", e)
+                        paymentESService.update(paymentId) {
+                            it.logProcessing(false, System.currentTimeMillis(), null, reason = "Retry scheduling failed: ${e.message}")
+                        }
+                        releaseSlot()
+                    }
                 }
-            } catch (e: Exception) {
-                logger.error("Failed to schedule retry for payment $paymentId", e)
-                paymentESService.update(paymentId) {
-                    it.logProcessing(false, System.currentTimeMillis(), null, reason = "Retry scheduling failed: ${e.message}")
-                }
-                releaseSlot()
-            }
         } catch (e: Exception) {
             logger.error("Payment {} attempt={} failed with exception", paymentId, attempt, e)
             runCatching {

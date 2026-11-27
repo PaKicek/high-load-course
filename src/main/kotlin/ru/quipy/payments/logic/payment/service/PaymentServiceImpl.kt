@@ -3,6 +3,7 @@ package ru.quipy.payments.logic.payment.service
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.*
+import java.util.concurrent.CompletableFuture
 
 @Service
 class PaymentServiceImpl(
@@ -25,6 +26,21 @@ class PaymentServiceImpl(
             if (!completed) needsRetry = true
         }
         return !needsRetry
+    }
+
+    override fun submitPaymentRequestFuture(
+        paymentId: UUID,
+        amount: Int,
+        paymentStartedAt: Long,
+        deadline: Long,
+        attempt: Int,
+    ): CompletableFuture<Boolean> {
+        val futures = paymentAccounts.map {
+            it.performPaymentAsyncFuture(paymentId, amount, paymentStartedAt, deadline, attempt)
+        }
+        return CompletableFuture.allOf(*futures.toTypedArray()).thenApply {
+            futures.all { it.get() }
+        }
     }
 
     override fun totalThroughputPerMs(): Double {
